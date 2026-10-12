@@ -333,7 +333,10 @@ def orga(tmp_path):
     (o / "x/cle.pem").write_text("k")
     (o / "x/.ssh").mkdir()
     (o / "x/.ssh/config").write_text("c")
-    (o / "lien").symlink_to(Path.home())
+    maison = tmp_path / "maison"  # un dossier hors du projet, comme le dossier personnel
+    maison.mkdir()
+    (maison / ".zshrc").write_text("z")
+    (o / "lien").symlink_to(maison)
     (o / "lien-env").symlink_to(o / "x/.env")
     (tmp_path / "dehors.md").write_text("d")
     return o

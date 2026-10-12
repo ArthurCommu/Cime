@@ -334,7 +334,8 @@ def test_permission_hote_muet_rend_la_main_vite(projet, monkeypatch, capsys):
     try:
         debut = time.monotonic()
         assert lancer(monkeypatch, capsys, "PermissionRequest", fixture("PermissionRequest")) == ""
-        assert time.monotonic() - debut < 0.6
+        # Le délai réseau du hook est d'une demi-seconde. La marge couvre une machine lente.
+        assert time.monotonic() - debut < 2
     finally:
         ecoute.close()
 

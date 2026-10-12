@@ -1,4 +1,4 @@
-"""Enveloppe pytest de la suite JavaScript de la scène : `node --test tests/scene/js/`.
+"""Enveloppe pytest de la suite JavaScript de la scène : `node --test tests/scene/js/*.test.mjs`.
 
 Pas de navigateur : tout se teste sous node avec la surface PNG. Sans node, le test est sauté.
 """
@@ -17,7 +17,9 @@ def test_suite_js_de_la_scene():
     if node is None:
         pytest.skip("node absent : la suite JavaScript de la scène ne tourne pas")
     resultat = subprocess.run(
-        [node, "--test", "tests/scene/js/"],
+        # Les fichiers sont nommés un à un : un dossier passé à `node --test` n'est accepté
+        # qu'à partir de Node 23.
+        [node, "--test", *sorted(str(f.relative_to(RACINE)) for f in (RACINE / "tests/scene/js").glob("*.test.mjs"))],
         cwd=RACINE,
         capture_output=True,
         text=True,

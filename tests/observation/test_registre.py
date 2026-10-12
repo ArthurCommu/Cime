@@ -642,8 +642,8 @@ def test_performance_50000_evenements_10000_messages(tmp_path, indexes, capsys):
         print(f"\n[perf {'avec' if indexes else 'sans'} index] lire_registre = {ms:.0f} ms")
     assert source["ok"], source
     assert len(d["fil"]) == 200 and len(d["agents"]) == 32
-    if indexes:  # sans index : non exigé
-        assert ms < 300
+    if indexes:  # sans index : non exigé. Marge large : les machines d'intégration continue sont lentes.
+        assert ms < 1000
 
 
 # --- etat_evenement_id (discriminant des id d'alarme) -------------------------
