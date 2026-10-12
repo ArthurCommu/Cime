@@ -1,0 +1,122 @@
+/* Cime — détail d'une équipe (s'ajoute à style.css). */
+/* la fiche : ses sections dans l'ordre de l'utilisateur, serrées pour que le terminal tienne dans le premier écran */
+.fiche { display: flex; flex-direction: column; gap: 18px; }
+.eq-tete {
+  background: var(--carte); border: 1px solid var(--bord); border-left: 3px solid var(--ton);
+  border-radius: var(--rayon); padding: 14px 18px; display: flex; flex-direction: column; gap: 8px;
+}
+.eq-titre { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.eq-titre h1 { margin: 0; font-family: var(--mono); font-size: 24px; font-weight: 500; }
+.eq-mission { margin: 0; color: var(--texte-doux); font-size: 15px; }
+.eq-faits { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 20px; }
+.eq-fait { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.eq-cle { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--discret); }
+.eq-barre { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: var(--champ); }
+.eq-barre > span { display: block; height: 100%; }
+.eq-barre .faites { background: var(--vert); }
+.eq-barre .en-cours { background: var(--ambre); }
+.eq-note {
+  background: var(--bleu-fond); border: 1px solid var(--bleu-bord); color: var(--bleu-clair);
+  border-radius: var(--rayon-petit); padding: 8px 12px; font-size: 13px;
+}
+.eq-agents { display: flex; flex-direction: column; gap: 6px; }
+/* un agent vivant : une ligne de 44 px (nom, état, tâche, notes) ; sa carte complète s'ouvre dessous */
+.eq-agent {
+  background: var(--carte); border: 1px solid var(--bord); border-left: 3px solid var(--ton);
+  border-radius: var(--rayon); min-width: 0;
+}
+.eq-agent > summary {
+  display: grid; grid-template-columns: minmax(150px, 220px) auto minmax(0, 1fr) auto; align-items: center; gap: 4px 12px;
+  min-height: 44px; padding: 6px 14px; cursor: pointer; list-style: none;
+}
+.eq-agent > summary::-webkit-details-marker { display: none; }
+.eq-agent > summary:hover { background: var(--champ); }
+.eq-agent-tache { min-width: 0; font-size: 13px; color: var(--texte-doux); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eq-agent-notes { display: inline-flex; align-items: baseline; gap: 4px 10px; font-size: 12px; color: var(--discret); white-space: nowrap; }
+.eq-agent-attend { color: var(--ambre); }
+.eq-agent-corps { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+/* les workers terminés : une ligne repliée, puis une ligne par worker */
+.eq-termines > summary { display: flex; align-items: center; min-height: 36px; cursor: pointer; font-size: 13px; color: var(--secondaire); }
+.eq-termines-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.eq-termine {
+  display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) auto; align-items: baseline; gap: 4px 12px;
+  padding: 7px 4px; border-top: 1px solid var(--bord); font-size: 13px; color: var(--secondaire);
+}
+.eq-termine-nom { color: var(--texte-doux); }
+.eq-termine-tache { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* périmètre et dépendances : repliés, un titre de section dont la ligne de résumé dit l'essentiel */
+.eq-repli { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); }
+.eq-repli > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 16px; cursor: pointer; list-style: none; }
+.eq-repli > summary::-webkit-details-marker { display: none; }
+.eq-repli > summary::before { content: '▸'; color: var(--discret); flex: none; }
+.eq-repli[open] > summary::before { content: '▾'; }
+.eq-repli > summary h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--texte-doux); }
+.eq-repli-corps { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.eq-repli-corps > p { margin: 0; }
+.eq-brouillon {
+  border: 1px dashed var(--ambre); background: var(--ambre-fond); border-radius: var(--rayon-petit);
+  padding: 8px 12px; font-size: 12px; color: var(--texte-doux); margin-top: -4px;
+}
+.eq-brouillon strong { color: var(--ambre); font-weight: 600; }
+.eq-brouillon p { margin: 4px 0 0; font-family: var(--mono); font-size: 12px; }
+
+/* Terminal */
+.terminal-bloc { background: var(--fond-creux); border: 1px solid var(--bord); border-radius: var(--rayon); overflow: hidden; }
+.terminal-barre {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 12px;
+  border-bottom: 1px solid var(--bord); font-size: 12px; color: var(--secondaire);
+}
+.terminal-choix { display: flex; flex-wrap: wrap; gap: 4px; }
+.terminal-choix button {
+  background: transparent; color: var(--secondaire); border: 1px solid var(--bord); border-radius: var(--rayon-petit);
+  padding: 6px 10px; min-height: 36px; font-family: var(--mono); font-size: 12px;
+}
+.terminal-choix button[aria-pressed="true"] { background: var(--champ); color: var(--texte); border-color: var(--bord-fort); box-shadow: inset 0 -2px 0 var(--ambre); }
+.terminal-meta { margin-left: auto; display: flex; gap: 6px 14px; flex-wrap: wrap; }
+.terminal-lecture {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+  border: 1px solid var(--bord-fort); border-radius: 999px; padding: 0 8px; color: var(--texte-doux);
+}
+.terminal {
+  margin: 0; padding: 14px; min-height: 253px; max-height: 340px; overflow: auto; background: #101216; color: var(--texte-doux);
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.terminal-vide { padding: 14px; color: var(--secondaire); }
+
+/* Périmètre */
+.perim { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 14px; align-items: start; }
+.perim-carte { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.perim-carte h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--texte-doux); }
+.perim-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.perim-liste li { font-family: var(--mono); font-size: 12.5px; }
+.fichier { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 7px 10px; border-radius: var(--rayon-petit); border: 1px solid transparent; }
+.fichier[data-hors="oui"] { background: var(--rouge-fond); border-color: var(--rouge-bord); border-left: 3px solid var(--rouge); }
+.fichier-nom { font-family: var(--mono); font-size: 12.5px; flex: 1 1 260px; min-width: 0; }
+.fichier[data-hors="oui"] .fichier-nom { color: var(--rouge-clair); font-weight: 500; }
+.fichier-marque { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; color: var(--vert-clair); }
+.fichier[data-hors="oui"] .fichier-marque { color: var(--fond); background: var(--rouge); border-radius: 5px; padding: 3px 8px; }
+.perim-alerte {
+  background: var(--rouge-fond); border: 1px solid var(--rouge-bord); border-left: 3px solid var(--rouge);
+  color: var(--rouge-clair); border-radius: var(--rayon); padding: 12px 16px; font-weight: 500;
+}
+.perim-ok { color: var(--vert-clair); }
+
+/* Dépendances, clôture */
+.liens-dep { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.liens-dep ul { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.cloture-zone { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.cloture-zone p { margin: 0; flex: 1 1 260px; color: var(--texte-doux); }
+
+@media (max-width: 760px) {
+  .eq-tete { padding: 12px 14px; }
+  .eq-titre h1 { font-size: 20px; }
+  .eq-faits { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+  .fiche { gap: 16px; }
+  .eq-agent > summary { grid-template-columns: minmax(0, 1fr) auto; }
+  .eq-agent-tache { grid-column: 1; }
+  .eq-termine { grid-template-columns: minmax(0, 1fr) auto; }
+  .eq-termine-tache { grid-column: 1 / -1; grid-row: 2; }
+  .perim { grid-template-columns: 1fr; }
+  .terminal-meta { margin-left: 0; }
+  .terminal { white-space: pre; overflow-wrap: normal; max-height: 300px; font-size: 12px; }
+}

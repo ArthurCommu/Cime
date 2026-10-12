@@ -1,0 +1,14 @@
+/* Cime — équipes clôturées (s'ajoute à style.css). */
+.arch-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; align-items: start; }
+.arch-carte {
+  background: var(--carte); border: 1px solid var(--bord); border-left: 3px solid var(--bleu);
+  border-radius: var(--rayon); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0;
+}
+.arch-tete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.arch-nom { font-family: var(--mono); font-size: 17px; font-weight: 500; }
+.arch-mission { margin: 0; color: var(--texte-doux); }
+.arch-faits { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--secondaire); }
+.arch-fichiers { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; font-family: var(--mono); font-size: 12px; color: var(--texte-doux); }
+.arch-cle { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--discret); }
+.arch-lien { font-size: 14px; align-self: flex-start; padding: 8px 0; min-height: 36px; }
+@media (max-width: 760px) { .arch-liste { grid-template-columns: 1fr; } }

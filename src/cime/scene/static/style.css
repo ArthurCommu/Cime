@@ -1,0 +1,105 @@
+:root {
+  --fond: #f4f1ea;
+  --texte: #1d2030;
+  --discret: #5b6276;
+  --bandeau: #b45309;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fond: #161a24;
+    --texte: #f4efe1;
+    --discret: #8a93a6;
+    --bandeau: #f2a33a;
+  }
+}
+
+:root[data-theme="dark"] {
+  --fond: #161a24;
+  --texte: #f4efe1;
+  --discret: #8a93a6;
+  --bandeau: #f2a33a;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--fond);
+  color: var(--texte);
+  font-family: system-ui, sans-serif;
+}
+
+h1 {
+  font-size: 1.15rem;
+  margin: 0 0 4px;
+}
+
+.bandeau {
+  margin: 0 0 12px;
+  color: var(--bandeau);
+  font-weight: 600;
+}
+
+body {
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Le conteneur de la scène : la scène y crée son canvas et le fait remplir. */
+#port {
+  height: calc(100vh - 190px);
+  min-height: 240px;
+  background: var(--fond);
+}
+
+#infobulle,
+#ouverture {
+  color: var(--discret);
+  min-height: 1.2em;
+  margin: 8px 0 0;
+}
+
+details {
+  margin-top: 16px;
+  color: var(--discret);
+}
+
+summary {
+  cursor: pointer;
+  color: var(--texte);
+  font-weight: 600;
+}
+
+#legende section {
+  margin-top: 12px;
+}
+
+#legende h2 {
+  font-size: 0.9rem;
+  margin: 0 0 6px;
+  color: var(--texte);
+}
+
+#legende ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+#legende li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

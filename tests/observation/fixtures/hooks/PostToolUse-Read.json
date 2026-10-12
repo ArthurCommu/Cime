@@ -1,0 +1,25 @@
+{
+  "session_id": "6b85d155-638b-4e90-8b70-3c53dcae0b2c",
+  "transcript_path": "/home/exemple/.claude/projects/-home-exemple-projet/6b85d155-638b-4e90-8b70-3c53dcae0b2c.jsonl",
+  "cwd": "/home/exemple/projet",
+  "scratchpad_dir": "/tmp/claude-1000/-home-exemple-projet/6b85d155-638b-4e90-8b70-3c53dcae0b2c/scratchpad",
+  "prompt_id": "25f8df49-a2c0-4977-af77-a573f531c9a8",
+  "permission_mode": "default",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Read",
+  "tool_input": {
+    "file_path": "/home/exemple/projet/lisme.txt"
+  },
+  "tool_response": {
+    "type": "text",
+    "file": {
+      "filePath": "/home/exemple/projet/lisme.txt",
+      "content": "hello\n",
+      "numLines": 2,
+      "startLine": 1,
+      "totalLines": 2
+    }
+  },
+  "tool_use_id": "toolu_01Reyzz6QX3UdDHQ7DCogHWF",
+  "duration_ms": 3
+}

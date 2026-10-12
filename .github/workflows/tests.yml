@@ -1,0 +1,33 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    # macOS : la plateforme visée par Cime (launchd, open, notifications), et celle où les
+    # tests qui ouvrent de vraies sessions tmux ont été écrits et éprouvés.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: tmux
+        run: brew install tmux
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Python 3.12 et dépendances
+        run: |
+          uv python install 3.12
+          uv sync --python 3.12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tests Python
+        run: uv run pytest tests -q
+
+      - name: Tests JavaScript (la Scène)
+        run: node --test tests/scene/js/*.test.mjs

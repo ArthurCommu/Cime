@@ -1,0 +1,24 @@
+    lèvent jamais et n'appellent que [38;5;153mlist-sessions[39m et [38;5;153mcapture-pane[39m.
+  - [1mCaptures réelles :[0m
+    - Les 5 captures [38;5;153mex-coord-*[39m sont copiées et donnent [38;5;153m""[39m.
+    - J'ai fabriqué deux vrais brouillons (une ligne, deux lignes) : le texte
+      est rendu exactement.
+    - J'ai gardé un écran d'autorisation réel, qui donne [38;5;153mNone[39m.
+  - [1mNettoyage :[0m les sessions [38;5;153mex-essai-*[39m sont tuées et les dossiers
+    temporaires supprimés. [38;5;153mex-assistant[39m n'a jamais été capturé.
+  - [1mDossier jetable :[0m le premier lancement de [38;5;153mclaude[39m a demandé de faire
+    confiance au dossier ; j'ai accepté.
+
+  Fichiers :
+  - [38;5;153msrc/exemple/tmux.py[39m
+  - [38;5;153mtests/exemple/test_tmux.py[39m
+  - [38;5;153mtests/exemple/fixtures/LISEZMOI.md[39m
+  - [38;5;153m/home/exemple/projet/.orga/teams/ebservation/report
+[39m    [38;5;153ms/worker-equipe-t3-tmux-2026-10-07.md[39m
+
+[38;5;246m✻[39m [38;5;246mSautéed for 1m 33s · done 19:49[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[39m❯ [2mTermine la tâche[0m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;220m⏵⏵ auto mode on[38;5;246m (shift+tab to cycle) · ← 1 agent[39m

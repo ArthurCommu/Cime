@@ -1,0 +1,24 @@
+  - [38;5;153mintervalle_s[39m n'est borné à [2, 5] que pour la valeur par défaut. Quand [38;5;153mdeps[39m
+    est injecté, il n'est pas borné.
+  - Un 503 de [38;5;153m/api/etat[39m compte comme « le serveur répond » pour détecter un doublon.
+  - [38;5;153mserveur.port[39m n'est effacé que si ce processus l'a écrit, pour qu'un échec de
+    bind n'efface pas le fichier d'un autre serveur.
+  - [38;5;153mStaticFiles[39m de Starlette lève une erreur si le dossier est absent, même avec
+    [38;5;153mcheck_dir=False[39m. J'ai ajouté une sous-classe qui répond 404.
+
+  [1mIncertitudes :[0m
+  - Les fixtures sont écrites à la main : l'exemple canonique de
+    [38;5;153mdocs/exemples/[39m n'existait pas au démarrage.
+  - Je n'ai pas de test explicite de l'arrêt du générateur SSE à la déconnexion
+    du client.
+  - Ctrl-C n'est pas testé.
+
+  Rapport : [38;5;153m/home/exemple/projet/rapports/repor
+[39m  [38;5;153mts/worker-alpha-t1-socle-serveur.md[39m
+
+[38;5;246m✻[39m [38;5;246mCrunched for 9m 45s · done 19:51[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[39m❯ [2mPasse à la tâche suivante t2[0m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;220m⏵⏵ auto mode on[38;5;246m (shift+tab to cycle) · ← 1 agent[39m

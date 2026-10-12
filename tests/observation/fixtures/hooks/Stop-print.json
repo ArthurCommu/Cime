@@ -1,0 +1,12 @@
+{
+  "session_id": "0f873312-b065-4812-9b6e-72c0ef89c3d3",
+  "transcript_path": "/home/exemple/.claude/projects/-home-exemple-projet/0f873312-b065-4812-9b6e-72c0ef89c3d3.jsonl",
+  "cwd": "/home/exemple/projet",
+  "prompt_id": "9b3c9a25-a52b-44e0-a7a2-c7814d8a3dcf",
+  "permission_mode": "default",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "Le fichier `lisme.txt` contient :\n```\nhello\n```\n\nPour la commande `ls`, je dois demander votre approbation pour l'exécuter. Voulez-vous que je procède ?",
+  "background_tasks": [],
+  "session_crons": []
+}

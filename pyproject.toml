@@ -1,0 +1,33 @@
+[project]
+name = "cime"
+version = "0.2.0"
+description = "Superviser une équipe d'agents Claude Code organisée comme une petite entreprise."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Arthur Communal" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = ["starlette", "uvicorn", "python-multipart"]
+
+[project.scripts]
+cime = "cime.cli:main"
+
+[dependency-groups]
+dev = ["pytest", "httpx"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cime"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

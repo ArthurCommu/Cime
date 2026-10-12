@@ -1,0 +1,9 @@
+{
+  "session_id": "7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8",
+  "transcript_path": "/home/exemple/.claude/projects/-tmp-exemple/7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8.jsonl",
+  "cwd": "/tmp/exemple",
+  "scratchpad_dir": "/tmp/claude-exemple/-tmp-exemple/7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8/scratchpad",
+  "hook_event_name": "SessionStart",
+  "source": "startup",
+  "model": "claude-haiku-4-5-20251001"
+}

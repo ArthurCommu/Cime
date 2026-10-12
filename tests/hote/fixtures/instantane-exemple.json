@@ -1,0 +1,1317 @@
+{
+  "version": 2,
+  "genere_a": "2026-10-07T13:04:11.123Z",
+  "duree_collecte_ms": 612,
+  "projet": {
+    "nom": "mon-projet",
+    "racine": "/home/exemple/mon-projet",
+    "prefixe": "cc",
+    "branche_reference": "main",
+    "etapes": [
+      {
+        "nom": "Cadrage : vision, découpage et décisions de l'utilisateur",
+        "atteinte": true,
+        "date": "2026-10-07"
+      },
+      {
+        "nom": "Maquette complétée, validée par l'utilisateur",
+        "atteinte": false,
+        "date": null
+      },
+      {
+        "nom": "Le registre des échanges fonctionne sur ce projet-ci",
+        "atteinte": false,
+        "date": null
+      },
+      {
+        "nom": "La page montre l'entreprise de ce projet-ci en direct",
+        "atteinte": false,
+        "date": null
+      },
+      {
+        "nom": "Autoriser une demande depuis la page",
+        "atteinte": false,
+        "date": null
+      },
+      {
+        "nom": "Un nouveau projet se crée en une commande, avec un Assistant prêt à démarrer",
+        "atteinte": false,
+        "date": null
+      }
+    ]
+  },
+  "sources": [
+    {
+      "nom": "structure",
+      "ok": true
+    },
+    {
+      "nom": "registre",
+      "ok": true
+    },
+    {
+      "nom": "transcripts",
+      "ok": true
+    },
+    {
+      "nom": "tmux",
+      "ok": true
+    },
+    {
+      "nom": "git",
+      "ok": true
+    },
+    {
+      "nom": "tarifs",
+      "ok": false,
+      "erreur": "table des tarifs introuvable : .orga/tarifs.json"
+    }
+  ],
+  "agents": [
+    {
+      "id": "utilisateur",
+      "role": "utilisateur",
+      "equipe": null,
+      "parent": null,
+      "session_tmux": null,
+      "vivant": null,
+      "etat": "inconnu",
+      "etat_depuis": null,
+      "etat_source": null,
+      "tache": null,
+      "derniere_phrase": null,
+      "modele": null,
+      "contexte": null,
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "assistant",
+      "role": "assistant",
+      "equipe": null,
+      "parent": "utilisateur",
+      "session_tmux": "cc-assistant",
+      "vivant": true,
+      "etat": "travaille",
+      "etat_depuis": "2026-10-07T13:03:51.123Z",
+      "etat_source": "hook:PostToolUse",
+      "tache": "Coordonner les équipes et répondre à l'utilisateur",
+      "derniere_phrase": "Trois points bloquent : une autorisation, une question sans réponse, un recouvrement sur tmux.py.",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 640000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "coord-fondation",
+      "role": "coordinateur",
+      "equipe": "fondation",
+      "parent": "assistant",
+      "session_tmux": "cc-coord-fondation",
+      "vivant": true,
+      "etat": "au_repos",
+      "etat_depuis": "2026-10-07T12:38:11.123Z",
+      "etat_source": "hook:Stop",
+      "tache": null,
+      "derniere_phrase": "Je lance la relecture croisée du registre avec l'équipe observation tout de suite.",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 210000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "coord-observation",
+      "role": "coordinateur",
+      "equipe": "observation",
+      "parent": "assistant",
+      "session_tmux": "cc-coord-observation",
+      "vivant": true,
+      "etat": "travaille",
+      "etat_depuis": "2026-10-07T13:02:11.123Z",
+      "etat_source": "hook:PostToolUse",
+      "tache": "Assembler l'instantané à partir des mesures tmux et git",
+      "derniere_phrase": "Le module tmux est branché ; j'attends la décision sur le serveur absent avant de figer la règle.",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 380000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "coord-hote",
+      "role": "coordinateur",
+      "equipe": "hote",
+      "parent": "assistant",
+      "session_tmux": "cc-coord-hote",
+      "vivant": true,
+      "etat": "attend_reponse",
+      "etat_depuis": "2026-10-07T12:50:11.123Z",
+      "etat_source": "registre:question",
+      "tache": "Exposer la liste des sessions tmux au serveur local",
+      "derniere_phrase": "Je suis bloqué sur le partage de tmux.py avec observation, j'ai posé la question à l'Assistant.",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 295000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "coord-page",
+      "role": "coordinateur",
+      "equipe": "page",
+      "parent": "assistant",
+      "session_tmux": "cc-coord-page",
+      "vivant": true,
+      "etat": "attend_autorisation",
+      "etat_depuis": "2026-10-07T12:57:11.123Z",
+      "etat_source": "hook:PermissionRequest",
+      "tache": "Valider la maquette statique contre le schéma",
+      "derniere_phrase": "Je lance les tests de conformité de la maquette dès que la commande est autorisée.",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 412000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": {
+        "texte": "Je propose de scinder la vue du graphe en deux onglets, mais avant de trancher je voudrais relire le schéma des arêtes",
+        "depuis": "2026-10-07T12:55:11.000Z"
+      },
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "coord-verification",
+      "role": "coordinateur",
+      "equipe": "verification",
+      "parent": "assistant",
+      "session_tmux": "cc-coord-verification",
+      "vivant": true,
+      "etat": "travaille",
+      "etat_depuis": "2026-10-07T12:41:11.123Z",
+      "etat_source": "hook:PostToolUse",
+      "tache": "Vérifier l'observation sur le dépôt réel (sessions tmux et retard sur la base)",
+      "derniere_phrase": "Je rejoue la vérification des sessions tmux sur le dépôt réel après le correctif d'observation.",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 150000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "coord-cadrage",
+      "role": "coordinateur",
+      "equipe": "cadrage",
+      "parent": "assistant",
+      "session_tmux": null,
+      "vivant": false,
+      "etat": "arrete",
+      "etat_depuis": "2026-10-07T06:54:11.123Z",
+      "etat_source": "hook:SessionEnd",
+      "tache": null,
+      "derniere_phrase": "Cadrage consigné, clôture validée par l'utilisateur. Fin de session.",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 310000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "worker-observation-tmux",
+      "role": "worker",
+      "equipe": "observation",
+      "parent": "coord-observation",
+      "session_tmux": "cc-worker-observation-tmux",
+      "vivant": true,
+      "etat": "attend_reponse",
+      "etat_depuis": "2026-10-07T12:33:11.123Z",
+      "etat_source": "registre:question",
+      "tache": "Lister les sessions tmux et en tirer l'état vivant",
+      "derniere_phrase": "Je ne sais pas si l'absence de serveur tmux doit donner zéro session ou une mesure impossible.",
+      "modele": "claude-sonnet-5-5",
+      "contexte": {
+        "tokens": 88000,
+        "limite": 200000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "worker-observation-git",
+      "role": "worker",
+      "equipe": "observation",
+      "parent": "coord-observation",
+      "session_tmux": "cc-worker-observation-git",
+      "vivant": false,
+      "etat": "arrete",
+      "etat_depuis": "2026-10-07T12:46:11.123Z",
+      "etat_source": "tmux:session_absente",
+      "tache": "Mesurer branche, commit et retard sur la base",
+      "derniere_phrase": "J'ai écrit la mesure du retard sur la base, je passe aux fichiers touchés.",
+      "modele": "claude-sonnet-5-5",
+      "contexte": {
+        "tokens": 97000,
+        "limite": 200000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "worker-hote-serveur",
+      "role": "worker",
+      "equipe": "hote",
+      "parent": "coord-hote",
+      "session_tmux": "cc-worker-hote-serveur",
+      "vivant": true,
+      "etat": "inconnu",
+      "etat_depuis": "2026-10-07T13:01:11.123Z",
+      "etat_source": "aucun_evenement",
+      "tache": "Écrire le serveur HTTP local de l'instantané",
+      "derniere_phrase": null,
+      "modele": "claude-sonnet-5-5",
+      "contexte": null,
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "worker-hote-tests",
+      "role": "worker",
+      "equipe": "hote",
+      "parent": "coord-hote",
+      "session_tmux": "cc-worker-hote-tests",
+      "vivant": true,
+      "etat": "inconnu",
+      "etat_depuis": "2026-10-07T12:41:11.123Z",
+      "etat_source": "aucun_evenement",
+      "tache": "Écrire les tests du serveur HTTP local de l'instantané",
+      "derniere_phrase": null,
+      "modele": "claude-sonnet-5-5",
+      "contexte": null,
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
+      "id": "worker-page-donnees",
+      "role": "worker",
+      "equipe": "page",
+      "parent": "coord-page",
+      "session_tmux": "cc-worker-page-donnees",
+      "vivant": true,
+      "etat": "travaille",
+      "etat_depuis": "2026-10-07T13:03:26.123Z",
+      "etat_source": "hook:PostToolUse",
+      "tache": "Écrire l'instantané d'exemple et son test de conformité",
+      "derniere_phrase": "Les trois fichiers JSON sont générés ; j'écris maintenant le test de conformité.",
+      "modele": "claude-sonnet-5-5",
+      "contexte": {
+        "tokens": 61000,
+        "limite": 200000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    }
+  ],
+  "equipes": [
+    {
+      "nom": "fondation",
+      "mission": "Poser les schémas, les seuils et le registre des échanges.",
+      "speciale": false,
+      "statut": "au_repos",
+      "cloturee_le": null,
+      "branche": "equipe/fondation",
+      "commit": "a41c9e2",
+      "worktree": "/home/exemple/mon-projet-fondation",
+      "avancement": {
+        "faites": 9,
+        "en_cours": 0,
+        "a_faire": 0
+      },
+      "fichiers_touches": [
+        "src/cime/fondation/registre.py",
+        "src/cime/fondation/seuils.py",
+        "tests/fondation/test_registre.py"
+      ],
+      "perimetre_declare": [
+        "src/cime/fondation/",
+        "tests/fondation/",
+        ".orga/contracts/"
+      ],
+      "hors_perimetre": [],
+      "retard_sur_base": 0,
+      "en_avance_sur_base": 0,
+      "depend_de": []
+    },
+    {
+      "nom": "observation",
+      "mission": "Mesurer l'état réel de l'entreprise : registre, tmux, git et transcripts.",
+      "speciale": false,
+      "statut": "bloquee",
+      "cloturee_le": null,
+      "branche": "equipe/observation",
+      "commit": "b7e92ed",
+      "worktree": "/home/exemple/mon-projet-observation",
+      "avancement": {
+        "faites": 4,
+        "en_cours": 2,
+        "a_faire": 3
+      },
+      "fichiers_touches": [
+        "src/cime/observation/instantane.py",
+        "src/cime/observation/tmux.py",
+        "tests/observation/test_tmux.py"
+      ],
+      "perimetre_declare": [
+        "src/cime/observation/",
+        "tests/observation/"
+      ],
+      "hors_perimetre": [],
+      "retard_sur_base": 0,
+      "en_avance_sur_base": 1,
+      "depend_de": [
+        "fondation"
+      ]
+    },
+    {
+      "nom": "hote",
+      "mission": "Servir l'instantané en local et exécuter les prérogatives de l'utilisateur.",
+      "speciale": false,
+      "statut": "bloquee",
+      "cloturee_le": null,
+      "branche": "equipe/hote",
+      "commit": "3d70f85",
+      "worktree": "/home/exemple/mon-projet-hote",
+      "avancement": {
+        "faites": 2,
+        "en_cours": 1,
+        "a_faire": 4
+      },
+      "fichiers_touches": [
+        "src/cime/hote/serveur.py",
+        "src/cime/observation/tmux.py"
+      ],
+      "perimetre_declare": [
+        "src/cime/hote/",
+        "tests/hote/"
+      ],
+      "hors_perimetre": [
+        "src/cime/observation/tmux.py"
+      ],
+      "retard_sur_base": 0,
+      "en_avance_sur_base": 0,
+      "depend_de": [
+        "observation",
+        "fondation"
+      ]
+    },
+    {
+      "nom": "page",
+      "mission": "Montrer à l'utilisateur l'entreprise en direct et recueillir ses décisions.",
+      "speciale": false,
+      "statut": "bloquee",
+      "cloturee_le": null,
+      "branche": "equipe/page",
+      "commit": "4c75f0a",
+      "worktree": "/home/exemple/mon-projet-page",
+      "avancement": {
+        "faites": 0,
+        "en_cours": 1,
+        "a_faire": 5
+      },
+      "fichiers_touches": [
+        "src/cime/page/maquette/exemple-etat.json",
+        "tests/page/test_exemple_etat.py"
+      ],
+      "perimetre_declare": [
+        "src/cime/page/",
+        "tests/page/"
+      ],
+      "hors_perimetre": [],
+      "retard_sur_base": 2,
+      "en_avance_sur_base": 3,
+      "depend_de": [
+        "hote"
+      ]
+    },
+    {
+      "nom": "verification",
+      "mission": "Vérifier de façon indépendante ce que les autres équipes déclarent avoir fait.",
+      "speciale": true,
+      "statut": "active",
+      "cloturee_le": null,
+      "branche": "equipe/verification",
+      "commit": "e03bb17",
+      "worktree": "/home/exemple/mon-projet-verification",
+      "avancement": {
+        "faites": 3,
+        "en_cours": 0,
+        "a_faire": 1
+      },
+      "fichiers_touches": [
+        "tests/verification/test_observation_reelle.py"
+      ],
+      "perimetre_declare": [
+        "tests/verification/",
+        ".orga/teams/verification/"
+      ],
+      "hors_perimetre": [],
+      "retard_sur_base": 0,
+      "en_avance_sur_base": 0,
+      "depend_de": [
+        "observation",
+        "hote",
+        "page"
+      ]
+    },
+    {
+      "nom": "cadrage",
+      "mission": "Cadrer la vision, le découpage en équipes et les décisions de l'utilisateur.",
+      "speciale": false,
+      "statut": "terminee",
+      "cloturee_le": "2026-10-07T06:58:11.123Z",
+      "branche": "equipe/cadrage",
+      "commit": "c19d7a3",
+      "worktree": "/home/exemple/mon-projet-cadrage",
+      "avancement": {
+        "faites": 5,
+        "en_cours": 0,
+        "a_faire": 0
+      },
+      "fichiers_touches": [
+        ".orga/etapes.md",
+        ".orga/dependencies.md",
+        "CLAUDE.md"
+      ],
+      "perimetre_declare": [
+        ".orga/",
+        "CLAUDE.md"
+      ],
+      "hors_perimetre": [],
+      "retard_sur_base": 0,
+      "en_avance_sur_base": 0,
+      "depend_de": []
+    }
+  ],
+  "fil": [
+    {
+      "id": "evt-324",
+      "horodatage": "2026-10-07T12:53:11.123Z",
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": null,
+      "resume": "Trois points : une autorisation attend ton clic, une question reste sans réponse, hôte et observation touchent le même fichier.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "hook",
+      "etat_livraison": null,
+      "preuve": null
+    },
+    {
+      "id": "evt-321",
+      "horodatage": "2026-10-07T12:52:11.123Z",
+      "de": "utilisateur",
+      "a": "assistant",
+      "nature": null,
+      "resume": "Fais le point sur ce qui bloque.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "hook",
+      "etat_livraison": null,
+      "preuve": null
+    },
+    {
+      "id": "msg-65",
+      "horodatage": "2026-10-07T12:50:11.123Z",
+      "de": "coord-hote",
+      "a": "assistant",
+      "nature": "question",
+      "resume": "Le garde m'a refusé une écriture dans observation. Qui tranche le partage de tmux.py ?",
+      "fichier": null,
+      "en_attente": true,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-64",
+      "horodatage": "2026-10-07T12:33:11.123Z",
+      "de": "worker-observation-tmux",
+      "a": "coord-observation",
+      "nature": "question",
+      "resume": "Faut-il traiter un serveur tmux absent comme zéro session ou comme mesure impossible ?",
+      "fichier": null,
+      "en_attente": true,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "fic-hote-1224",
+      "horodatage": "2026-10-07T12:24:11.123Z",
+      "de": "coord-hote",
+      "a": "assistant",
+      "nature": "question",
+      "resume": "Puis-je laisser l'observation toucher tmux.py, ou dois-je attendre sa fin ?",
+      "fichier": ".orga/teams/hote/conversations/pour-assistant-1224.md",
+      "en_attente": true,
+      "non_lu": false,
+      "source": "structure",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-63",
+      "horodatage": "2026-10-07T12:20:11.123Z",
+      "de": "coord-hote",
+      "a": "assistant",
+      "nature": "compte_rendu",
+      "resume": "Je dois toucher à src/cime/observation/tmux.py pour exposer la liste des sessions.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-62",
+      "horodatage": "2026-10-07T12:12:11.123Z",
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": "rapport_utilisateur",
+      "resume": "Fondation demande sa clôture (demande_cloture du coordinateur) : tous les livrables sont vérifiés.",
+      "fichier": null,
+      "en_attente": true,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-61",
+      "horodatage": "2026-10-07T12:09:11.123Z",
+      "de": "coord-fondation",
+      "a": "assistant",
+      "nature": "demande_cloture",
+      "resume": "Les neuf tâches de fondation sont faites et vérifiées. Je demande la clôture de l'équipe.",
+      "fichier": null,
+      "en_attente": true,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-60",
+      "horodatage": "2026-10-07T12:04:11.123Z",
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": "donnee_utilisateur",
+      "resume": "Dépose le fichier des tarifs des modèles : la source de coût de l'instantané est en échec.",
+      "fichier": null,
+      "en_attente": true,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-59",
+      "horodatage": "2026-10-07T11:54:11.123Z",
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": "decision_utilisateur",
+      "resume": "Le serveur de l'hôte doit-il aussi écouter sur le réseau local, ou rester sur localhost ?",
+      "fichier": null,
+      "en_attente": true,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-58",
+      "horodatage": "2026-10-07T11:34:11.123Z",
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": "rapport_utilisateur",
+      "resume": "Vérification de l'observation sur le dépôt réel : deux écarts relevés, détail dans le rapport.",
+      "fichier": ".orga/teams/verification/reports/observation-reelle-2026-10-07.md",
+      "en_attente": true,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-57",
+      "horodatage": "2026-10-07T11:32:11.123Z",
+      "de": "coord-verification",
+      "a": "assistant",
+      "nature": "signalement",
+      "resume": "Écart relevé : une session tmux absente est comptée vivante pendant 30 s dans l'observation.",
+      "fichier": ".orga/teams/verification/reports/observation-reelle-2026-10-07.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-56",
+      "horodatage": "2026-10-07T11:08:11.123Z",
+      "de": "assistant",
+      "a": "coord-page",
+      "nature": "reponse",
+      "resume": "Non : seuls les workers vivants ou en échec figurent dans l'arbre, les autres vont à l'archive.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-55",
+      "horodatage": "2026-10-07T11:04:11.123Z",
+      "de": "coord-page",
+      "a": "assistant",
+      "nature": "question",
+      "resume": "L'arbre de l'organigramme doit-il montrer aussi les workers terminés ?",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-54",
+      "horodatage": "2026-10-07T10:38:11.123Z",
+      "de": "assistant",
+      "a": "coord-hote",
+      "nature": "reponse",
+      "resume": "Port 8765, adresse 127.0.0.1 uniquement pour la v1.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-53",
+      "horodatage": "2026-10-07T10:34:11.123Z",
+      "de": "coord-hote",
+      "a": "assistant",
+      "nature": "question",
+      "resume": "Sur quel port le serveur local doit-il écouter ?",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "evt-318",
+      "horodatage": "2026-10-07T09:55:11.123Z",
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": null,
+      "resume": "L'observation avance : le registre est lu, tmux et git sont en cours. Rien ne bloque pour l'instant.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "hook",
+      "etat_livraison": null,
+      "preuve": null
+    },
+    {
+      "id": "evt-315",
+      "horodatage": "2026-10-07T09:54:11.123Z",
+      "de": "utilisateur",
+      "a": "assistant",
+      "nature": null,
+      "resume": "Où en est-on sur l'observation ?",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "hook",
+      "etat_livraison": null,
+      "preuve": null
+    },
+    {
+      "id": "msg-52",
+      "horodatage": "2026-10-07T09:44:11.123Z",
+      "de": "coord-observation",
+      "a": "worker-observation-git",
+      "nature": "consigne",
+      "resume": "Mesurer branche, commit, fichiers touchés et retard sur la base de chaque équipe.",
+      "fichier": ".orga/teams/observation/tasks/todo/o3-git.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-51",
+      "horodatage": "2026-10-07T09:04:11.123Z",
+      "de": "coord-observation",
+      "a": "worker-observation-tmux",
+      "nature": "consigne",
+      "resume": "Lister les sessions tmux du projet et en tirer l'état vivant de chaque agent.",
+      "fichier": ".orga/teams/observation/tasks/todo/o2-tmux.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-50",
+      "horodatage": "2026-10-07T08:09:11.123Z",
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": "rapport_utilisateur",
+      "resume": "Fondation a livré le registre des échanges : schéma, écriture atomique et tests verts.",
+      "fichier": ".orga/teams/fondation/reports/registre-2026-10-07.md",
+      "en_attente": false,
+      "source": "registre",
+      "etat_livraison": "livre",
+      "non_lu": true,
+      "preuve": {
+        "voie": "hote",
+        "horodatage": "2026-10-07T12:12:11.123Z"
+      }
+    },
+    {
+      "id": "msg-49",
+      "horodatage": "2026-10-07T08:04:11.123Z",
+      "de": "coord-fondation",
+      "a": "assistant",
+      "nature": "travail_pret",
+      "resume": "Registre des échanges : schéma et écriture atomique livrés, neuf tâches faites, tests verts.",
+      "fichier": ".orga/teams/fondation/reports/registre-2026-10-07.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-48",
+      "horodatage": "2026-10-07T07:32:11.123Z",
+      "de": "assistant",
+      "a": "coord-page",
+      "nature": "consigne",
+      "resume": "Construire la maquette statique de la page à partir d'un instantané d'exemple.",
+      "fichier": ".orga/teams/page/tasks/todo/p1-t1-donnees-exemple.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-47",
+      "horodatage": "2026-10-07T07:22:11.123Z",
+      "de": "assistant",
+      "a": "coord-hote",
+      "nature": "consigne",
+      "resume": "Servir l'instantané en local et exécuter les prérogatives de l'utilisateur.",
+      "fichier": ".orga/teams/hote/tasks/todo/h1-serveur.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-46",
+      "horodatage": "2026-10-07T07:12:11.123Z",
+      "de": "assistant",
+      "a": "coord-observation",
+      "nature": "consigne",
+      "resume": "Produire l'instantané : lire le registre, tmux, git et les transcripts.",
+      "fichier": ".orga/teams/observation/tasks/todo/o1-instantane.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-45",
+      "horodatage": "2026-10-07T07:02:11.123Z",
+      "de": "assistant",
+      "a": "coord-fondation",
+      "nature": "consigne",
+      "resume": "Écrire le schéma du registre des échanges et son écriture atomique.",
+      "fichier": ".orga/teams/fondation/tasks/todo/f1-registre.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-44",
+      "horodatage": "2026-10-07T06:53:11.123Z",
+      "de": "assistant",
+      "a": "coord-cadrage",
+      "nature": "consigne",
+      "resume": "L'utilisateur valide la clôture du cadrage. Ferme ta session après ton dernier commit.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "evt-312",
+      "horodatage": "2026-10-07T06:52:11.123Z",
+      "de": "utilisateur",
+      "a": "assistant",
+      "nature": null,
+      "resume": "Clôture du cadrage : d'accord.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "hook",
+      "etat_livraison": null,
+      "preuve": null
+    },
+    {
+      "id": "msg-43",
+      "horodatage": "2026-10-07T06:48:11.123Z",
+      "de": "coord-cadrage",
+      "a": "assistant",
+      "nature": "demande_cloture",
+      "resume": "Cadrage terminé, tous les livrables sont consignés. Je demande la clôture de l'équipe cadrage.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-42",
+      "horodatage": "2026-10-07T06:44:11.123Z",
+      "de": "coord-cadrage",
+      "a": "assistant",
+      "nature": "travail_pret",
+      "resume": "Cadrage consigné : étapes du projet, dépendances entre équipes, mandats des cinq équipes.",
+      "fichier": ".orga/teams/cadrage/reports/cadrage-2026-10-07.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "msg-41",
+      "horodatage": "2026-10-07T06:29:11.123Z",
+      "de": "assistant",
+      "a": "coord-cadrage",
+      "nature": "consigne",
+      "resume": "Consigner le découpage validé : étapes, dépendances et mandats des cinq équipes.",
+      "fichier": ".orga/teams/cadrage/tasks/todo/c1-consigner-decoupage.md",
+      "en_attente": false,
+      "non_lu": false,
+      "source": "registre",
+      "etat_livraison": "clos",
+      "preuve": {}
+    },
+    {
+      "id": "evt-309",
+      "horodatage": "2026-10-07T06:24:11.123Z",
+      "de": "utilisateur",
+      "a": "assistant",
+      "nature": null,
+      "resume": "Le découpage me va. On garde toujours la même hiérarchie : je ne parle qu'à toi.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "hook",
+      "etat_livraison": null,
+      "preuve": null
+    },
+    {
+      "id": "evt-306",
+      "horodatage": "2026-10-07T06:06:11.123Z",
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": null,
+      "resume": "Compris. Je découpe en équipes : fondation, observation, hôte, page, vérification. Je te soumets le découpage avant de lancer quoi que ce soit.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "hook",
+      "etat_livraison": null,
+      "preuve": null
+    },
+    {
+      "id": "evt-303",
+      "horodatage": "2026-10-07T06:04:11.123Z",
+      "de": "utilisateur",
+      "a": "assistant",
+      "nature": null,
+      "resume": "Je veux une application qui me permet de superviser l'entièreté des travaux de l'entreprise, voir où ça bloque, qui travaille.",
+      "fichier": null,
+      "en_attente": false,
+      "non_lu": false,
+      "source": "hook",
+      "etat_livraison": null,
+      "preuve": null
+    }
+  ],
+  "attentes_utilisateur": [
+    {
+      "id": "perm-d41",
+      "nature": "autorisation",
+      "titre": "Exécuter : uv run --with pytest pytest tests/page -q",
+      "bloque": "La validation de la maquette contre le schéma",
+      "depuis": "2026-10-07T12:57:11.123Z",
+      "agent": "coord-page",
+      "equipe": "page",
+      "actions": [
+        "autoriser",
+        "refuser"
+      ],
+      "message_id": null,
+      "objet": null
+    },
+    {
+      "id": "msg-59",
+      "nature": "decision",
+      "titre": "Le serveur de l'hôte écoute-t-il aussi sur le réseau local ?",
+      "bloque": "La configuration du serveur local de l'hôte",
+      "depuis": "2026-10-07T11:54:11.123Z",
+      "agent": "assistant",
+      "equipe": null,
+      "actions": [
+        "trancher"
+      ],
+      "message_id": 59,
+      "objet": null
+    },
+    {
+      "id": "msg-60",
+      "nature": "donnee",
+      "titre": "Déposer le fichier des tarifs des modèles",
+      "bloque": "Le coût estimé de chaque agent dans l'instantané",
+      "depuis": "2026-10-07T12:04:11.123Z",
+      "agent": "assistant",
+      "equipe": null,
+      "actions": [
+        "deposer"
+      ],
+      "message_id": 60,
+      "objet": null
+    },
+    {
+      "id": "msg-62",
+      "nature": "cloture",
+      "titre": "Clôturer l'équipe fondation",
+      "bloque": "Le retrait de la fondation du tableau des équipes actives",
+      "depuis": "2026-10-07T12:12:11.123Z",
+      "agent": "coord-fondation",
+      "equipe": "fondation",
+      "actions": [
+        "cloturer"
+      ],
+      "message_id": 62,
+      "objet": null
+    },
+    {
+      "id": "msg-58",
+      "nature": "rapport",
+      "titre": "Rapport de vérification de l'observation : deux écarts",
+      "bloque": "Rien : à lire avant de valider l'étape suivante",
+      "depuis": "2026-10-07T11:34:11.123Z",
+      "agent": "assistant",
+      "equipe": null,
+      "actions": [
+        "lu"
+      ],
+      "message_id": 58,
+      "objet": null
+    }
+  ],
+  "alarmes": [
+    {
+      "id": "autorisation_en_attente:coord-page:perm-d41",
+      "type": "autorisation_en_attente",
+      "gravite": "grave",
+      "agents": [
+        "coord-page"
+      ],
+      "equipes": [
+        "page"
+      ],
+      "depuis": "2026-10-07T12:57:11.123Z",
+      "mesure": "PermissionRequest reçue il y a 7 min, sans Stop, UserPromptSubmit ni PostToolUse depuis.",
+      "quoi_faire": "Autoriser ou refuser la commande dans « Ce qui t'attend »."
+    },
+    {
+      "id": "question_sans_reponse:worker-observation-tmux:msg-64",
+      "type": "question_sans_reponse",
+      "gravite": "grave",
+      "agents": [
+        "worker-observation-tmux",
+        "coord-observation"
+      ],
+      "equipes": [
+        "observation"
+      ],
+      "depuis": "2026-10-07T12:33:11.123Z",
+      "mesure": "Question du worker à son coordinateur, en attente depuis 31 min (seuil 15 min).",
+      "quoi_faire": "Demander à l'Assistant de relancer coord-observation pour qu'il réponde au worker."
+    },
+    {
+      "id": "recouvrement:hote+observation:src/cime/observation/tmux.py",
+      "type": "recouvrement",
+      "gravite": "grave",
+      "agents": [
+        "coord-hote",
+        "coord-observation"
+      ],
+      "equipes": [
+        "hote",
+        "observation"
+      ],
+      "depuis": "2026-10-07T12:20:11.123Z",
+      "mesure": "Les branches equipe/hote et equipe/observation modifient toutes deux src/cime/observation/tmux.py.",
+      "quoi_faire": "Faire trancher par l'Assistant quelle équipe garde tmux.py avant toute fusion."
+    },
+    {
+      "id": "session_disparue:worker-observation-git:cc-worker-observation-git",
+      "type": "session_disparue",
+      "gravite": "grave",
+      "agents": [
+        "worker-observation-git"
+      ],
+      "equipes": [
+        "observation"
+      ],
+      "depuis": "2026-10-07T12:46:11.123Z",
+      "mesure": "La session tmux cc-worker-observation-git a disparu alors que sa tâche n'est pas rendue.",
+      "quoi_faire": "Demander à l'Assistant de faire relancer le worker par coord-observation."
+    },
+    {
+      "id": "bloque_au_demarrage:worker-hote-tests:1791376860",
+      "type": "bloque_au_demarrage",
+      "gravite": "grave",
+      "agents": [
+        "worker-hote-tests"
+      ],
+      "equipes": [
+        "hote"
+      ],
+      "depuis": "2026-10-07T12:41:00.000Z",
+      "mesure": "Aucun événement de worker-hote-tests depuis la création de cc-worker-hote-tests (23 min) ; la dernière ligne de l'écran est « Enter to confirm · Esc to cancel ».",
+      "quoi_faire": "Demander à l'Assistant de relancer ce worker : la page ne répond pas aux écrans de démarrage."
+    },
+    {
+      "id": "brouillon:coord-page:1791377711",
+      "type": "brouillon",
+      "gravite": "a_voir",
+      "agents": [
+        "coord-page"
+      ],
+      "equipes": [
+        "page"
+      ],
+      "depuis": "2026-10-07T12:55:11.000Z",
+      "mesure": "Texte non envoyé dans le champ de saisie de cc-coord-page depuis 9 min.",
+      "quoi_faire": "Regarder le terminal : le brouillon sera perdu si la session est interrompue."
+    },
+    {
+      "id": "contexte_plein:assistant:claude-opus-5-5",
+      "type": "contexte_plein",
+      "gravite": "a_voir",
+      "agents": [
+        "assistant"
+      ],
+      "equipes": [],
+      "depuis": "2026-10-07T12:29:11.123Z",
+      "mesure": "640 000 jetons sur 1 000 000 (64 %, seuil 60 %), lus dans le transcript.",
+      "quoi_faire": "Prévoir un /compact de l'Assistant entre deux sujets."
+    },
+    {
+      "id": "hors_perimetre:hote:src/cime/observation/tmux.py",
+      "type": "hors_perimetre",
+      "gravite": "a_voir",
+      "agents": [
+        "coord-hote"
+      ],
+      "equipes": [
+        "hote"
+      ],
+      "depuis": "2026-10-07T12:20:11.123Z",
+      "mesure": "git diff : src/cime/observation/tmux.py est modifié hors du périmètre déclaré de l'équipe hote.",
+      "quoi_faire": "Demander à l'Assistant d'élargir le périmètre ou de faire annuler la modification."
+    },
+    {
+      "id": "action_refusee:coord-hote:5127",
+      "type": "action_refusee",
+      "gravite": "a_voir",
+      "agents": [
+        "coord-hote"
+      ],
+      "equipes": [
+        "hote"
+      ],
+      "depuis": "2026-10-07T12:47:11.123Z",
+      "mesure": "Le garde a refusé une écriture dans src/cime/observation/ (PreToolUse, événement 5127).",
+      "quoi_faire": "Lire le refus dans le terminal ; la demande de partage de tmux.py est déjà posée à l'Assistant."
+    },
+    {
+      "id": "question_sans_reponse:coord-hote:fic-hote-1224",
+      "type": "question_sans_reponse",
+      "gravite": "a_voir",
+      "agents": [
+        "coord-hote"
+      ],
+      "equipes": [
+        "hote"
+      ],
+      "depuis": "2026-10-07T12:24:11.123Z",
+      "mesure": "Question écrite de coord-hote à l'Assistant, sans réponse depuis 40 min (seuil 30 min).",
+      "quoi_faire": "Répondre à coord-hote, ou lui faire répondre par l'Assistant."
+    },
+    {
+      "id": "fige:coord-verification:1791376871",
+      "type": "fige",
+      "gravite": "a_voir",
+      "agents": [
+        "coord-verification"
+      ],
+      "equipes": [
+        "verification"
+      ],
+      "depuis": "2026-10-07T12:41:11.123Z",
+      "mesure": "coord-verification est en train de travailler, mais ni le registre ni tmux n'ont signalé d'activité depuis 23 min (seuil 15 min).",
+      "quoi_faire": "Demander à l'Assistant de regarder le terminal de coord-verification et de le relancer."
+    },
+    {
+      "id": "retard_sur_base:page:main",
+      "type": "retard_sur_base",
+      "gravite": "info",
+      "agents": [
+        "coord-page"
+      ],
+      "equipes": [
+        "page"
+      ],
+      "depuis": "2026-10-07T12:04:11.123Z",
+      "mesure": "La branche equipe/page a 2 commits de retard sur main.",
+      "quoi_faire": "Rien d'urgent ; l'équipe se mettra à jour avant la prochaine fusion."
+    }
+  ],
+  "flux": [
+    {
+      "id": 59,
+      "de": "assistant",
+      "a": "utilisateur",
+      "nature": "decision_utilisateur",
+      "objet": null,
+      "resume": "Le serveur de l'hôte écoute-t-il aussi sur le réseau local ?",
+      "transitions": [
+        {
+          "etat": "inscrit",
+          "horodatage": "2026-10-07T11:54:11.123Z",
+          "voie": null,
+          "auteur": "assistant"
+        }
+      ],
+      "etat": "inscrit",
+      "debiteur": "utilisateur",
+      "echeance": "2026-10-07T11:54:11.123Z"
+    }
+  ],
+  "aretes": [
+    {
+      "de": "assistant",
+      "a": "utilisateur",
+      "en_file": 1,
+      "livre": 0,
+      "ouvertes": 1,
+      "total_15min": 0
+    }
+  ],
+  "ordres": [],
+  "facteur": {
+    "battement": "2026-10-07T13:00:05.000Z",
+    "age_s": 6,
+    "arrete": false
+  }
+}

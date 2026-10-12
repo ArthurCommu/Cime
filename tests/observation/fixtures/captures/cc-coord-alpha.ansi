@@ -1,0 +1,24 @@
+
+[38;5;220m⚠[39m [38;5;220mYour login expires in 3 days[38;5;246m · run /login to renew[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mLis le fichier de consigne puis commence ta mission.[39m
+
+[49m  [38;5;246mRan [1m3[0m[38;5;246m shell commands [39m
+
+[38;5;231m⏺[39m Je regarde la maquette (structure, styles, sections).
+
+[38;5;246m⏺[39m Reading the journal section, steps, checking tooling
+[38;5;246m  ⎿  $ cd /home/exemple/projet && grep -n '^## ' [39m
+     [38;5;246mdocs/journal.md; sed -n '/^## 4/,/^## 5/p' [39m
+     [38;5;246mdocs/journal.md; cat docs/CHANGELOG.md; cat [39m
+     [38;5;246mdocs/etapes.md | head -30; which python3 pytest node npx; python3 -c [39m
+     [38;5;246m"import playwright; prin…[39m
+
+[38;5;174m✢[39m [38;5;216mCooking…[38;5;174m [38;5;246m(51s · ↓[39m [38;5;246m2.8k tokens)[39m
+[38;5;246m  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's [39m
+     [38;5;246mcurrent work[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;220m⏵⏵ auto mode on[38;5;246m (shift+tab to cycle) · esc to interrupt · ← 1 agent[39m

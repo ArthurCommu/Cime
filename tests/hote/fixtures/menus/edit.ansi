@@ -1,0 +1,50 @@
+
+[38;5;246m[48;5;237m❯ [38;5;231mUse the Bash tool to run exactly: touch /private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/a.txt . Do nothing else.[39m
+
+[49m  [38;5;246mRan [1m1[0m[38;5;246m shell command [39m
+
+[38;5;231m⏺[39m Done.
+
+[38;5;246m✻[39m [38;5;246mBaked for 3s · done 1:08[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mUse the Write tool to create the file /private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/b.txt with content 'hello'. Do nothing else.[39m
+
+[38;5;211m[49m⏺[39m [1mWrite[0m(]8;id=1xt8zri;file:///private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/b.txt\b.txt]8;;\)
+[38;5;246m  ⎿  [38;5;239mUser rejected write to [1mb.txt[0m
+     [2m[38;5;231m 1 hello[0m
+
+[38;5;246m✻[39m [38;5;246mCooked for 2s · done 1:09[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mUse the Write tool again to create the file /private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/b.txt with content 'hello'. Do nothing else.[39m
+
+[38;5;114m[49m⏺[39m [1mWrite[0m(]8;id=1xt8zri;file:///private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/b.txt\b.txt]8;;\)
+[38;5;246m  ⎿  [39mWrote [1m1[0m line to [1mb.txt[0m
+     [2m[38;5;231m 1 [0m[38;5;231mhello[39m
+
+[38;5;231m⏺[39m Done.
+
+[38;5;246m✻[39m [38;5;246mBrewed for 2s · done 1:09[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mUse the Edit tool to replace 'hello' by 'bonjour' in /private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/b.txt. Do nothing else.[39m
+[49m
+  [38;5;246mRead [1m1[0m[38;5;246m file [39m
+
+[38;5;231m⏺[39m Now I'll edit the file:
+
+[38;5;246m⏺[39m [1mUpdate[0m(]8;id=1xt8zri;file:///private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/b.txt\b.txt]8;;\)
+
+[38;5;153m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;153mEdit file[0m
+ [38;5;246mb.txt[39m
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[38;5;167m[48;5;52m 1 -[38;5;231mhello
+[2m[49m 1 [0m[38;5;231m  No newline at end of file[39m
+[38;5;77m[48;5;22m 2 +[38;5;231mbonjour
+[2m[49m 3 [0m[38;5;231m  No newline at end of file[39m
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m Do you want to make this edit to [1mb.txt[0m?
+ [38;5;153m❯[39m [38;5;246m1. [38;5;153mYes[39m
+   [38;5;246m2. [39mYes, and switch to [1maccept edits (auto-approve file edits and common file commands)[0m for this session [1m(shift+tab)[0m
+   [38;5;246m3. [39mNo
+
+ [38;5;246mEsc to cancel · Tab to amend[39m

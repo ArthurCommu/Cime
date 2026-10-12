@@ -1,0 +1,705 @@
+<!doctype html>
+<!-- La page du lanceur : les projets de la machine, créer, ajouter, fermer, rouvrir.
+     Un seul fichier, servi tel quel par le lanceur. -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cime — lanceur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --fond: #14161A; --fond-creux: #16181D; --carte: #1B1E24; --champ: #22262E;
+  --bord: #2E333C; --bord-fort: #45484F; --texte: #ECEAE5; --texte-doux: #CFCBC4;
+  --secondaire: #A6A29B; --discret: #7E7A74; --vert: #58A89B; --vert-clair: #8FD0C4;
+  --vert-fond: #1B2A28; --ambre: #E0A458; --ambre-fond: #2A231A; --ambre-bord: #3B3026;
+  --rouge: #D96A5F; --rouge-clair: #E89A91; --rouge-fond: #2C1D1C; --rouge-bord: #452F2C;
+  --rayon: 10px; --rayon-petit: 7px;
+  --police: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --gouttiere: 32px;
+}
+@media (max-width: 600px) { :root { --gouttiere: 16px; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fond); color: var(--texte); font-family: var(--police); font-size: 15px; line-height: 1.5; }
+button, input { font-family: inherit; font-size: inherit; }
+button { cursor: pointer; }
+main { max-width: 760px; margin: 0 auto; padding: 22px var(--gouttiere) 40px; }
+h1 { margin: 0 0 4px; font-size: 26px; font-weight: 600; letter-spacing: -0.2px; font-family: var(--mono); }
+.sous { color: var(--secondaire); margin: 0 0 24px; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--secondaire); margin: 28px 0 10px; }
+.mono { font-family: var(--mono); font-size: 0.86em; }
+.carte { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; }
+.projet { display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 8px; }
+.projet .infos { min-width: 0; flex: 1; }
+.projet .nom { font-weight: 500; }
+.projet .chemin { color: var(--discret); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; flex-shrink: 0; }
+.btn { background: var(--champ); color: var(--texte-doux); border: 1px solid var(--bord-fort); border-radius: var(--rayon-petit); padding: 9px 14px; font-size: 13px; font-weight: 500; min-height: 40px; }
+.btn:hover:not(:disabled) { border-color: var(--secondaire); color: var(--texte); }
+.btn.principal { background: var(--vert-fond); border-color: var(--vert); color: var(--vert-clair); }
+.btn:disabled { opacity: .55; cursor: default; }
+.vide { color: var(--secondaire); border-style: dashed; border-color: var(--bord-fort); }
+label { display: block; font-size: 13px; color: var(--secondaire); margin: 12px 0 4px; }
+label small { color: var(--discret); }
+input { width: 100%; background: var(--champ); color: var(--texte); border: 1px solid var(--bord); border-radius: var(--rayon-petit); padding: 10px 12px; font-size: 14px; min-height: 42px; }
+input:focus { outline: 2px solid var(--vert); outline-offset: 0; border-color: var(--vert); }
+form .btn { margin-top: 14px; }
+.ligne { display: flex; gap: 8px; }
+.ligne .btn { margin-top: 0; }
+.message { margin-top: 12px; border-radius: var(--rayon-petit); padding: 10px 12px; font-size: 14px; overflow-wrap: anywhere; }
+.message.erreur { background: var(--rouge-fond); border: 1px solid var(--rouge-bord); color: var(--rouge-clair); }
+.message.ok { background: var(--vert-fond); border: 1px solid var(--vert); color: var(--vert-clair); }
+.message.avert { background: var(--ambre-fond); border: 1px solid var(--ambre-bord); border-left: 3px solid var(--ambre); color: var(--texte-doux); }
+pre.mono { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; }
+.commande { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
+.commande code { flex: 1; min-width: 0; background: var(--fond-creux); border: 1px solid var(--bord); border-radius: var(--rayon-petit); padding: 9px 12px; font-family: var(--mono); font-size: 13px; color: var(--texte); overflow-wrap: anywhere; }
+.commande .btn { margin-top: 0; }
+#bandeau { margin-bottom: 12px; }
+@media (max-width: 600px) {
+  .projet { flex-direction: column; align-items: stretch; }
+  .actions .btn { flex: 1; }
+  .ligne { flex-direction: column; }
+}
+/* --- états ouvert/fermé, fermer, rouvrir, conversations, installer --- */
+.projet { flex-wrap: wrap; }
+.etat { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--secondaire); margin-left: 10px; white-space: nowrap; }
+.etat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--discret); }
+.etat.ouvert { color: var(--vert-clair); }
+.etat.ouvert::before { background: var(--vert); border-color: var(--vert); }
+.retour-carte { flex-basis: 100%; min-width: 0; }
+.retour-carte .message { margin-top: 4px; }
+.message .boutons, .apercu .boutons { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.message .boutons .btn, .apercu .boutons .btn { margin: 0; }
+.btn.avert { background: var(--ambre-fond); border-color: var(--ambre); color: var(--ambre); }
+.repli { flex-basis: 100%; min-width: 0; border-top: 1px solid var(--bord); padding-top: 8px; margin-top: 2px; }
+.repli > summary { list-style: none; cursor: pointer; color: var(--secondaire); font-size: 13px; padding: 6px 0; min-height: 32px; display: flex; align-items: center; gap: 6px; }
+.repli > summary::-webkit-details-marker { display: none; }
+.repli > summary::before { content: "›"; display: inline-block; transition: transform .15s; font-size: 15px; }
+.repli[open] > summary::before { transform: rotate(90deg); }
+.attente { color: var(--secondaire); font-size: 13px; margin: 6px 0; }
+.convs { list-style: none; margin: 4px 0 0; padding: 0; }
+.convs li { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 4px 14px; align-items: center; padding: 9px 10px; border-radius: var(--rayon-petit); }
+.convs li + li { border-top: 1px solid var(--bord); }
+.convs li:hover { background: var(--champ); }
+.convs .quand { font-variant-numeric: tabular-nums; color: var(--secondaire); font-size: 13px; }
+.convs .quand b { display: block; font-weight: 500; color: var(--vert-clair); font-size: 11.5px; letter-spacing: .3px; }
+.convs .debut { color: var(--texte-doux); font-size: 13.5px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.convs .debut.sans { color: var(--discret); font-style: italic; }
+.convs .btn { min-height: 34px; padding: 6px 12px; }
+.autres { background: none; border: 0; color: var(--secondaire); font-size: 13px; padding: 8px 10px; text-decoration: underline; text-underline-offset: 3px; }
+.apercu { margin-top: 12px; background: var(--fond-creux); border: 1px solid var(--bord-fort); border-left: 3px solid var(--ambre); border-radius: var(--rayon-petit); padding: 12px 14px; font-size: 14px; overflow-wrap: anywhere; }
+.apercu h3 { margin: 0 0 4px; font-size: 14.5px; font-weight: 600; }
+.apercu p { margin: 0 0 8px; color: var(--texte-doux); }
+.apercu dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 12px; margin: 10px 0 4px; }
+.apercu dt { color: var(--secondaire); font-size: 13px; }
+.apercu dd { margin: 0; font-family: var(--mono); font-size: 12.5px; color: var(--texte); overflow-wrap: anywhere; }
+.apercu dd.courant { font-family: var(--police); font-size: 13.5px; color: var(--texte-doux); }
+.apercu dd span { display: block; }
+.apercu dd small { font-family: var(--police); color: var(--discret); font-size: 12px; }
+.apercu label { margin-top: 10px; }
+@media (max-width: 600px) {
+  .etat { margin-left: 0; display: flex; margin-top: 2px; white-space: normal; }
+  .convs li { grid-template-columns: minmax(0, 1fr) auto; }
+  .convs .debut { grid-column: 1 / -1; grid-row: 2; }
+  .apercu dl { grid-template-columns: 1fr; gap: 2px; }
+  .apercu dd { margin-bottom: 6px; }
+  .message .boutons .btn, .apercu .boutons .btn { flex: 1; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Cime — lanceur</h1>
+  <p class="sous">Créer, ouvrir, fermer ou rouvrir un projet.</p>
+
+  <div id="bandeau"></div>
+
+  <h2>Projets</h2>
+  <div id="liste"></div>
+
+  <h2>Nouveau projet</h2>
+  <form id="form-nouveau" class="carte" novalidate>
+    <label for="n-utilisateur">Ton prénom</label>
+    <input id="n-utilisateur" autocomplete="given-name" spellcheck="false">
+    <label for="n-parent">Dossier parent <small>(chemin absolu)</small></label>
+    <input id="n-parent" autocomplete="off" spellcheck="false" placeholder="/Users/ton-nom/Projets">
+    <label for="n-nom">Nom <small>(lettres minuscules, chiffres, tirets)</small></label>
+    <input id="n-nom" autocomplete="off" spellcheck="false" placeholder="mon-projet">
+    <label for="n-prefixe">Préfixe <small>(facultatif, même règle)</small></label>
+    <input id="n-prefixe" autocomplete="off" spellcheck="false">
+    <button type="submit" class="btn principal" id="n-bouton">Créer le projet</button>
+    <div id="n-retour"></div>
+  </form>
+
+  <h2>Ajouter un projet existant</h2>
+  <form id="form-ajouter" class="carte" novalidate>
+    <label for="a-chemin">Chemin du projet <small>(chemin absolu)</small></label>
+    <div class="ligne">
+      <input id="a-chemin" autocomplete="off" spellcheck="false" placeholder="/Users/ton-nom/Projets/mon-projet">
+      <button type="submit" class="btn principal" id="a-bouton">Ajouter</button>
+    </div>
+    <div id="a-retour"></div>
+  </form>
+</main>
+<script>
+"use strict";
+const REGLE = /^[a-z0-9-]+$/;
+const NBSP = " ";
+const PLAFOND = 8;
+const CHEMINS_MAX = 6;
+const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+const $ = (id) => document.getElementById(id);
+let horloge = () => Date.now();
+let utilisateurConnu = "";
+let signature = null;
+const retours = new Map(); // chemin -> messages gardés dans la carte quand la liste est redessinée
+
+function el(tag, classe, texte) {
+  const e = document.createElement(tag);
+  if (classe) e.className = classe;
+  if (texte !== undefined) e.textContent = texte;
+  return e;
+}
+
+function msg(genre, ...parts) {
+  const m = el("div", "message " + genre);
+  m.append(...parts);
+  return m;
+}
+
+function afficher(zone, genre, texte) {
+  zone.replaceChildren();
+  if (!texte) return;
+  const m = el("div", "message " + genre);
+  if (String(texte).includes("\n")) m.appendChild(el("pre", "mono", texte));
+  else m.textContent = texte;
+  zone.appendChild(m);
+  return m;
+}
+
+// Une erreur affichée est une phrase : le `message` du serveur, sinon `generique`.
+// Défense en profondeur : un message qui ressemble à du JSON brut n'est jamais affiché.
+function phraseErreur(reponse, generique) {
+  const m = reponse && typeof reponse.message === "string" ? reponse.message.trim() : "";
+  if (!m || /^[{[]/.test(m) || m.includes('"resultat"')) return generique;
+  return m;
+}
+
+async function appel(route, corps) {
+  try {
+    const r = await fetch(route, corps === undefined ? {} : {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps),
+    });
+    const j = await r.json().catch(() => null);
+    if (j && typeof j === "object") return j;
+    return { resultat: "erreur", message: "Réponse illisible du serveur (HTTP " + r.status + ")." };
+  } catch (e) {
+    return { resultat: "erreur", message: "Le serveur du lanceur est injoignable." };
+  }
+}
+
+// --- textes (fonctions pures) ---
+
+function gardees(n) {
+  return n === 1 ? "1 conversation gardée" : n + " conversations gardées";
+}
+
+function libelleEtat(p) {
+  if (p.etat !== "ferme") return "Ouvert";
+  return p.conversations >= 1 ? "Fermé · " + gardees(p.conversations) : "Fermé";
+}
+
+function nomLisible(agent) {
+  const a = String(agent);
+  if (a === "assistant") return "l'Assistant";
+  let m = /^coord-(.+)$/.exec(a);
+  if (m) return "le coordinateur " + m[1];
+  m = /^worker-([^-]+)(?:-|$)/.exec(a);
+  if (m) return "un worker de " + m[1];
+  return a;
+}
+
+function dateCourte(iso, maintenant) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  // espaces insécables dans l'heure et dans la date : la ligne ne peut couper qu'après la virgule
+  const heure = pad(d.getHours()) + NBSP + "h" + NBSP + pad(d.getMinutes());
+  const jour = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const ecart = Math.round((jour(new Date(maintenant)) - jour(d)) / 86400000);
+  if (ecart === 0) return "aujourd'hui, " + heure;
+  if (ecart === 1) return "hier, " + heure;
+  return d.getDate() + NBSP + MOIS[d.getMonth()] + ", " + heure;
+}
+
+function deDate(court) {
+  return /^(hier|aujourd'hui)/.test(court) ? "d'" + court : "du " + court;
+}
+
+function phraseResultat(rep, maintenant, mode) {
+  const fenetre = rep.fenetre !== false;
+  if (mode === "installer") {
+    return fenetre
+      ? "Cime est installé dans ce dossier. L'Assistant démarre dans une fenêtre de terminal."
+      : "Cime est installé dans ce dossier, mais la fenêtre de terminal n'a pas pu s'ouvrir. Pour rejoindre l'Assistant" + NBSP + ":";
+  }
+  const quand = rep.conversation && rep.conversation.date ? dateCourte(rep.conversation.date, maintenant) : "";
+  if (!fenetre) {
+    return "L'Assistant a repris sa conversation" + (quand ? " " + deDate(quand) : "")
+      + ", mais la fenêtre de terminal n'a pas pu s'ouvrir. Pour le rejoindre" + NBSP + ":";
+  }
+  let t = "L'Assistant a repris " + (quand ? "sa conversation " + deDate(quand) : "sa dernière conversation")
+    + ", dans une fenêtre de terminal.";
+  const equipes = Array.isArray(rep.equipes) ? rep.equipes.filter(Boolean) : [];
+  if (equipes.length) {
+    t += " " + (equipes.length === 1 ? "Coordinateur relancé" : "Coordinateurs relancés") + NBSP + ": " + equipes.join(", ") + ".";
+  }
+  return t;
+}
+
+// --- messages d'une carte ---
+
+function poser(chemin, zone, noeuds) {
+  zone.replaceChildren(...noeuds);
+  retours.set(chemin, noeuds.filter((n) => !n.interactif));
+}
+
+function effacer(chemin, zone) {
+  retours.delete(chemin);
+  zone.replaceChildren();
+}
+
+function nomsMono(liste) {
+  const s = el("span");
+  liste.forEach((t, i) => { if (i) s.append(", "); s.appendChild(el("span", "mono", t)); });
+  return s;
+}
+
+function lignesTaches(taches, quand) {
+  if (!Array.isArray(taches) || !taches.length) return null;
+  const n = taches.length;
+  if (quand === "fermer") {
+    return msg("avert", n === 1 ? "1 tâche de worker restera en cours" + NBSP + ": " : n + " tâches de worker resteront en cours" + NBSP + ": ", nomsMono(taches));
+  }
+  return msg("avert",
+    n === 1 ? "1 tâche de worker est restée en cours" + NBSP + ": " : n + " tâches de worker sont restées en cours" + NBSP + ": ",
+    nomsMono(taches),
+    ". L'Assistant le sait" + NBSP + "; c'est lui qui décide de " + (n === 1 ? "la" : "les") + " relancer.");
+}
+
+function messageConfiance(rep) {
+  const suite = rep.fenetre !== false
+    ? " Dans la fenêtre de terminal qui vient de s'ouvrir, accepte avec Entrée" + NBSP + ": l'Assistant démarre ensuite."
+    : " Rejoins la session de l'Assistant avec la commande ci-dessous, puis accepte avec Entrée" + NBSP + ": l'Assistant démarre ensuite.";
+  return msg("avert", el("strong", "", "Claude Code demande s'il peut faire confiance à ce dossier."), suite);
+}
+
+// Ordre : confiance (ce que l'utilisateur doit faire), résultat, tâches restées en cours, échecs.
+function resultatReouverture(rep, maintenant, mode) {
+  const noeuds = [];
+  if (rep.a_approuver) noeuds.push(messageConfiance(rep));
+  const fenetre = rep.fenetre !== false;
+  const principal = msg(fenetre ? "ok" : "avert", phraseResultat(rep, maintenant, mode));
+  if (!fenetre) for (const c of (Array.isArray(rep.commandes) ? rep.commandes : [])) principal.appendChild(commandeCopiable(c));
+  noeuds.push(principal);
+  const taches = mode === "installer" ? null : lignesTaches(rep.taches_en_cours, "rouvrir");
+  if (taches) noeuds.push(taches);
+  for (const e of (Array.isArray(rep.echecs) ? rep.echecs : [])) {
+    noeuds.push(msg("avert", "Relance impossible pour " + nomLisible(e.agent) + NBSP + ": " + phraseErreur(e, "échec")));
+  }
+  return noeuds;
+}
+
+// --- liste des projets ---
+
+async function charger(force) {
+  const j = await appel("/api/projets");
+  const liste = $("liste");
+  if (!Array.isArray(j.projets)) {
+    liste.replaceChildren();
+    signature = null;
+    afficher($("bandeau"), "erreur", phraseErreur(j, "Liste des projets indisponible."));
+    return;
+  }
+  $("bandeau").replaceChildren();
+  utilisateurConnu = j.utilisateur || "";
+  if (j.utilisateur && !$("n-utilisateur").value) $("n-utilisateur").value = j.utilisateur;
+  const sig = JSON.stringify(j.projets);
+  if (!force && sig === signature) return;
+  signature = sig;
+  liste.replaceChildren();
+  if (!j.projets.length) {
+    liste.appendChild(el("div", "carte vide", "Aucun projet pour l'instant. Crée-en un ci-dessous, ou ajoute un dossier existant."));
+    return;
+  }
+  for (const p of j.projets) liste.appendChild(ligneProjet(p));
+}
+
+function ligneProjet(p) {
+  const ferme = p.etat === "ferme";
+  const c = el("div", "carte projet");
+  const infos = el("div", "infos");
+  const nom = el("div", "nom", p.nom);
+  nom.appendChild(el("span", ferme ? "etat" : "etat ouvert", libelleEtat(p)));
+  infos.append(nom, el("div", "chemin", p.chemin));
+  const retour = el("div", "retour-carte");
+  const actions = el("div", "actions");
+  const principal = el("button", "btn principal", ferme ? "Rouvrir" : "Ouvrir");
+  const second = el("button", "btn", ferme ? "Oublier" : "Fermer");
+  principal.type = second.type = "button";
+  if (ferme) {
+    principal.addEventListener("click", () => reouvrir(p, retour, principal, null, [principal]));
+    second.addEventListener("click", () => oublierProjet(p));
+  } else {
+    principal.addEventListener("click", () => ouvrirProjet(p, principal, retour));
+    second.addEventListener("click", () => fermerProjet(p, retour, second, false));
+  }
+  actions.append(principal, second);
+  c.append(infos, actions, retour);
+  const gardes = retours.get(p.chemin);
+  if (gardes) retour.append(...gardes);
+  if (ferme) c.appendChild(repliConversations(p, retour, principal));
+  return c;
+}
+
+async function ouvrirProjet(p, bouton, retour) {
+  // L'onglet s'ouvre au clic : après un await, le navigateur bloquerait window.open.
+  const w = window.open("", "_blank");
+  const libelle = bouton.textContent;
+  bouton.disabled = true;
+  bouton.textContent = "Ouverture…";
+  effacer(p.chemin, retour);
+  const j = await appel("/api/projets/ouvrir", { chemin: p.chemin });
+  bouton.disabled = false;
+  bouton.textContent = libelle;
+  if (j.resultat === "ok" && j.url) {
+    if (w) w.location = j.url;
+    else poser(p.chemin, retour, [msg("avert", "Le navigateur a bloqué l'onglet. Adresse du projet" + NBSP + ": " + j.url)]);
+  } else {
+    if (w) w.close();
+    poser(p.chemin, retour, [msg("erreur", phraseErreur(j, "Ouverture impossible."))]);
+  }
+}
+
+async function oublierProjet(p) {
+  if (!confirm("Oublier le projet «" + NBSP + p.nom + NBSP + "»" + NBSP + "?\n\nIl disparaît seulement de cette liste" + NBSP + ": le dossier n'est pas touché.")) return;
+  const j = await appel("/api/projets/oublier", { chemin: p.chemin });
+  // la liste d'abord : son rechargement vide le bandeau, le résultat doit rester visible
+  await charger(true);
+  afficher($("bandeau"), j.resultat === "ok" ? "ok" : "erreur", j.resultat === "ok" ? "" : phraseErreur(j, "Échec."));
+}
+
+// --- fermer ---
+
+function encartOccupes(p, retour, bouton, occupes) {
+  const n = occupes.length;
+  const noms = occupes.map(nomLisible);
+  const workers = occupes.filter((a) => /^worker-/.test(String(a))).length;
+  const m = msg("avert", el("strong", "", n === 1 ? "1 agent travaille encore" + NBSP + ":" : n + " agents travaillent encore" + NBSP + ":"), " " + noms.join(", ") + ".");
+  m.appendChild(el("br"));
+  let suite = n === 1 ? "Fermer maintenant coupe son tour en cours. Sa conversation est gardée" : "Fermer maintenant coupe leur tour en cours. Leurs conversations sont gardées";
+  if (workers) {
+    suite += NBSP + "; " + (workers === 1 ? "la tâche du worker restera" : "les tâches des workers resteront") + " «" + NBSP + "en cours" + NBSP + "»";
+  }
+  m.append(suite + ".");
+  const boutons = el("div", "boutons");
+  const non = el("button", "btn", "Ne pas fermer");
+  const oui = el("button", "btn avert", "Fermer quand même");
+  non.type = oui.type = "button";
+  non.addEventListener("click", () => { m.remove(); bouton.disabled = false; });
+  oui.addEventListener("click", () => { non.disabled = oui.disabled = true; fermerProjet(p, retour, bouton, true); });
+  boutons.append(non, oui);
+  m.appendChild(boutons);
+  m.interactif = true;
+  return m;
+}
+
+async function fermerProjet(p, retour, bouton, forcer) {
+  effacer(p.chemin, retour);
+  bouton.disabled = true;
+  bouton.textContent = "Fermeture…";
+  const j = await appel("/api/projets/fermer", forcer ? { chemin: p.chemin, forcer: true } : { chemin: p.chemin });
+  bouton.textContent = "Fermer";
+  if (j.resultat === "refuse" && Array.isArray(j.occupes)) {
+    retour.replaceChildren(encartOccupes(p, retour, bouton, j.occupes));
+    return; // « Fermer » reste grisé tant que l'encart est ouvert
+  }
+  if (j.resultat !== "ok") {
+    bouton.disabled = false;
+    poser(p.chemin, retour, [msg("erreur", phraseErreur(j, "Fermeture impossible."))]);
+    return;
+  }
+  const n = Array.isArray(j.conversations) ? j.conversations.length : 0;
+  const noeuds = [msg("ok", n >= 1 ? "Fermé · " + gardees(n) + "." : "Fermé.")];
+  const taches = lignesTaches(j.taches_en_cours, "fermer");
+  if (taches) noeuds.push(taches);
+  poser(p.chemin, retour, noeuds);
+  charger(true);
+}
+
+// --- rouvrir / reprendre ---
+
+async function reouvrir(p, retour, clic, session, desactiver) {
+  // Comme ouvrirProjet : l'onglet s'ouvre au clic.
+  const w = window.open("", "_blank");
+  const libelle = clic.textContent;
+  effacer(p.chemin, retour);
+  for (const b of desactiver) b.disabled = true;
+  clic.textContent = "Réouverture…";
+  const minuteur = setTimeout(() => { retour.replaceChildren(msg("avert", "L'Assistant reprend sa conversation…")); }, 2000);
+  const j = await appel("/api/projets/rouvrir", session ? { chemin: p.chemin, session } : { chemin: p.chemin });
+  clearTimeout(minuteur);
+  for (const b of desactiver) b.disabled = false;
+  clic.textContent = libelle;
+  if (j.resultat !== "ok") {
+    if (w) w.close();
+    poser(p.chemin, retour, [msg("erreur", phraseErreur(j, "Réouverture impossible."))]);
+    return;
+  }
+  const noeuds = resultatReouverture(j, horloge(), "rouvrir");
+  if (j.url) {
+    if (w) w.location = j.url;
+    else noeuds.push(msg("avert", "Le navigateur a bloqué l'onglet. Adresse du projet" + NBSP + ": " + j.url));
+  } else {
+    if (w) w.close();
+    if (j.avertissement) noeuds.push(msg("avert", j.avertissement));
+  }
+  poser(p.chemin, retour, noeuds);
+  charger(true);
+}
+
+function listeConversations(rep, maintenant, reprendre) {
+  const toutes = rep.conversations.slice();
+  const i = rep.fermeture ? toutes.findIndex((c) => c.session === rep.fermeture) : -1;
+  if (i > 0) toutes.unshift(toutes.splice(i, 1)[0]);
+  const racine = el("div");
+  if (!toutes.length) {
+    racine.appendChild(el("p", "attente", "Aucune conversation à reprendre."));
+    return racine;
+  }
+  const ul = el("ul", "convs");
+  const ligne = (c) => {
+    const li = el("li");
+    const quand = el("span", "quand");
+    if (rep.fermeture && c.session === rep.fermeture) quand.appendChild(el("b", "", "À LA FERMETURE"));
+    quand.append(dateCourte(c.date, maintenant));
+    // Le début est le contenu d'une conversation : toujours du texte, jamais du HTML.
+    const debut = el("span", c.debut ? "debut" : "debut sans", c.debut || "Aucun message de toi dans cette conversation");
+    const b = el("button", "btn", "Reprendre");
+    b.type = "button";
+    b.addEventListener("click", () => reprendre(c.session, b));
+    li.append(quand, debut, b);
+    return li;
+  };
+  toutes.slice(0, PLAFOND).forEach((c) => ul.appendChild(ligne(c)));
+  racine.appendChild(ul);
+  const reste = toutes.slice(PLAFOND);
+  if (reste.length) {
+    const b = el("button", "autres", "… et " + reste.length + (reste.length === 1 ? " autre" : " autres"));
+    b.type = "button";
+    b.addEventListener("click", () => { reste.forEach((c) => ul.appendChild(ligne(c))); b.remove(); });
+    racine.appendChild(b);
+  }
+  return racine;
+}
+
+function repliConversations(p, retour, principal) {
+  const d = el("details", "repli");
+  d.appendChild(el("summary", "", "Reprendre une autre conversation de l'Assistant"));
+  const zone = el("div");
+  d.appendChild(zone);
+  let charge = false;
+  d.addEventListener("toggle", async () => {
+    if (!d.open || charge) return;
+    charge = true;
+    zone.replaceChildren(el("p", "attente", "Chargement…"));
+    const j = await appel("/api/projets/conversations?chemin=" + encodeURIComponent(p.chemin));
+    if (j.resultat !== "ok" || !Array.isArray(j.conversations)) {
+      charge = false;
+      zone.replaceChildren(msg("erreur", phraseErreur(j, "Conversations indisponibles.")));
+      return;
+    }
+    zone.replaceChildren(listeConversations(j, horloge(), (session, bouton) => reouvrir(p, retour, bouton, session, [principal, bouton])));
+  });
+  return d;
+}
+
+// --- commande copiable ---
+
+function commandeCopiable(texte) {
+  const l = el("div", "commande");
+  const code = el("code", "", texte);
+  const b = el("button", "btn", "Copier");
+  b.type = "button";
+  b.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(texte); b.textContent = "Copié"; }
+    catch (e) {
+      const r = document.createRange(); r.selectNodeContents(code);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      b.textContent = "Sélectionné";
+    }
+    setTimeout(() => { b.textContent = "Copier"; }, 1500);
+  });
+  l.append(code, b);
+  return l;
+}
+
+// --- nouveau projet ---
+
+$("form-nouveau").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const retour = $("n-retour");
+  const utilisateur = $("n-utilisateur").value.trim();
+  const parent = $("n-parent").value.trim();
+  const nom = $("n-nom").value.trim();
+  const prefixe = $("n-prefixe").value.trim();
+  if (!utilisateur) return afficher(retour, "erreur", "Ton prénom est obligatoire.");
+  if (!parent.startsWith("/")) return afficher(retour, "erreur", "Le dossier parent doit être un chemin absolu (il commence par «" + NBSP + "/" + NBSP + "»).");
+  if (!nom) return afficher(retour, "erreur", "Le nom est obligatoire.");
+  if (!REGLE.test(nom)) return afficher(retour, "erreur", "Le nom ne peut contenir que des lettres minuscules sans accent, des chiffres et des tirets.");
+  if (prefixe && !REGLE.test(prefixe)) return afficher(retour, "erreur", "Le préfixe ne peut contenir que des lettres minuscules sans accent, des chiffres et des tirets.");
+  const bouton = $("n-bouton");
+  bouton.disabled = true;
+  bouton.textContent = "Création en cours…";
+  afficher(retour, "avert", "Création en cours… cela peut prendre jusqu'à deux minutes.");
+  const corps = { dossier_parent: parent, nom, utilisateur };
+  if (prefixe) corps.prefixe = prefixe;
+  const j = await appel("/api/projets/nouveau", corps);
+  bouton.disabled = false;
+  bouton.textContent = "Créer le projet";
+  if (j.resultat !== "ok") return afficher(retour, "erreur", phraseErreur(j, "Création impossible."));
+  retour.replaceChildren();
+  const ok = el("div", "message ok");
+  ok.appendChild(el("div", "", "Projet créé" + NBSP + ":"));
+  ok.appendChild(el("div", "mono", j.chemin));
+  ok.appendChild(el("div", "", "Pour rejoindre la session de l'Assistant" + NBSP + ":"));
+  ok.appendChild(commandeCopiable("tmux attach -t " + j.prefixe + "-assistant"));
+  retour.appendChild(ok);
+  if (j.a_approuver) {
+    const a = el("div", "message avert", "Un écran de confiance attend ton accord dans la session de l'Assistant" + NBSP + ": ouvre-la avec la commande ci-dessus et approuve-le une fois.");
+    retour.appendChild(a);
+  }
+  charger(true);
+});
+
+// --- ajouter un projet existant, et installer Cime dans un dossier qui n'en a pas ---
+
+const GLOSES = {
+  ".orga/": "équipes, registre, socle",
+  "CLAUDE.md": "s'il n'existe pas",
+  ".claude/settings.json": "règles de Cime ajoutées, les tiennes gardées",
+};
+
+function rubrique(dl, titre, chemins, courant, avecGloses) {
+  const dt = el("dt", "", titre);
+  const dd = el("dd", courant ? "courant" : "");
+  if (courant) dd.appendChild(el("span", "", courant));
+  for (const c of chemins.slice(0, CHEMINS_MAX)) {
+    const s = el("span", "", c);
+    // le chemin est parfois annoté par `cime` (« .claude/settings.json (+44) ») : affiché tel quel, glose sur le chemin seul
+    const cle = String(c).split(" (")[0].trim();
+    if (avecGloses && GLOSES[cle]) { s.append(" "); s.appendChild(el("small", "", GLOSES[cle])); }
+    dd.appendChild(s);
+  }
+  if (chemins.length > CHEMINS_MAX) {
+    const n = chemins.length - CHEMINS_MAX;
+    dd.appendChild(el("span", "", "… et " + n + (n === 1 ? " autre" : " autres")));
+  }
+  dl.append(dt, dd);
+}
+
+function encartInstaller(chemin, apercu) {
+  const d = el("div", "apercu");
+  d.interactif = true;
+  d.appendChild(el("h3", "", "Cime n'est pas encore installé dans ce dossier."));
+  const phrase = el("p");
+  phrase.append("Il sera ajouté sous le nom ", el("strong", "", apercu.nom), ", et l'Assistant démarrera dans une fenêtre de terminal.");
+  d.appendChild(phrase);
+  d.appendChild(el("p", "", apercu.commit
+    ? "Cime fera un commit pour enregistrer ces ajouts."
+    : "Cime ne fera aucun commit" + NBSP + ": les fichiers ajoutés resteront à valider par toi."));
+  const dl = el("dl");
+  const liste = (x) => (Array.isArray(x) ? x : []);
+  if (liste(apercu.cree).length) rubrique(dl, "Ajoutera", liste(apercu.cree), "", true);
+  if (liste(apercu.complete).length) rubrique(dl, "Complétera", liste(apercu.complete), "", true);
+  if (liste(apercu.garde).length) rubrique(dl, "Ne touchera pas", liste(apercu.garde), "", false);
+  else rubrique(dl, "Ne touchera pas", [], "ton CLAUDE.md, ton code, tes branches, tes conversations", false);
+  d.appendChild(dl);
+  let champ = null;
+  if (!utilisateurConnu) {
+    const l = el("label", "", "Ton prénom");
+    champ = el("input");
+    champ.id = "a-utilisateur";
+    l.htmlFor = champ.id;
+    champ.autocomplete = "given-name";
+    d.append(l, champ);
+  }
+  const erreur = el("div");
+  const boutons = el("div", "boutons");
+  const installer = el("button", "btn principal", "Installer Cime ici");
+  const annuler = el("button", "btn", "Annuler");
+  installer.type = annuler.type = "button";
+  annuler.addEventListener("click", () => { d.remove(); $("a-bouton").disabled = false; });
+  installer.addEventListener("click", async () => {
+    const corps = { chemin };
+    if (champ) {
+      const v = champ.value.trim();
+      if (!v) return afficher(erreur, "erreur", "Ton prénom est obligatoire.");
+      corps.utilisateur = v;
+    }
+    erreur.replaceChildren();
+    installer.disabled = annuler.disabled = true;
+    installer.textContent = "Installation…";
+    const j = await appel("/api/projets/installer", corps);
+    if (j.resultat !== "ok") {
+      installer.disabled = annuler.disabled = false;
+      installer.textContent = "Installer Cime ici";
+      afficher(erreur, "erreur", phraseErreur(j, "Installation impossible."));
+      return;
+    }
+    $("a-retour").replaceChildren(...resultatReouverture(j, horloge(), "installer"));
+    $("a-chemin").value = "";
+    $("a-bouton").disabled = false;
+    charger(true);
+  });
+  boutons.append(installer, annuler);
+  d.append(erreur, boutons);
+  return d;
+}
+
+$("form-ajouter").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const retour = $("a-retour");
+  const bouton = $("a-bouton");
+  if (bouton.disabled) return;
+  const chemin = $("a-chemin").value.trim();
+  if (!chemin.startsWith("/")) return afficher(retour, "erreur", "Le chemin doit être absolu (il commence par «" + NBSP + "/" + NBSP + "»).");
+  bouton.disabled = true;
+  retour.replaceChildren();
+  const j = await appel("/api/projets/ajouter", { chemin });
+  if (j.resultat === "refuse" && j.installable && j.apercu) {
+    retour.appendChild(encartInstaller(chemin, j.apercu)); // « Ajouter » reste grisé tant que l'encart est ouvert
+    return;
+  }
+  bouton.disabled = false;
+  if (j.resultat === "ok") {
+    $("a-chemin").value = "";
+    afficher(retour, "ok", j.message || "Projet ajouté.");
+    charger(true);
+  } else {
+    afficher(retour, "erreur", phraseErreur(j, "Ajout impossible."));
+  }
+});
+
+// Un `cime fermer` lancé au terminal doit se voir sans recharger la page.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") charger(false);
+});
+
+charger(true);
+</script>
+</body>
+</html>

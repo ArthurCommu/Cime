@@ -1,0 +1,24 @@
+
+[38;5;246m[48;5;237m❯ [38;5;231mLis le fichier de consigne puis commence ta mission.[39m
+
+[49m  [38;5;246mRan [1m5[0m[38;5;246m shell commands [39m
+
+[38;5;231m⏺[39m Je collecte des traces d'exemple pour rendre les
+  tâches de mes workers autonomes ; la politique de modèles n'étant pas
+  actée, je ne lance aucun worker.
+
+[38;5;246m⏺[39m Saving real escaped tmux captures and showing each prompt line
+[38;5;246m  ⎿  $ D=/home/exemple/projet/f
+[39m     [38;5;246mixtures-reelles/captures; mkdir -p $D; for s in $(tmux list-sessions -F [39m
+     [38;5;246m'#S'); do tmux capture-pane -t $s -p -e > $D/$s.ansi; L=$(grep -a '❯' [39m
+     [38;5;246m$D/$s.ansi | tail -1 | LC_ALL=C cat -v | LC_ALL=C cut -c1-120); echo "$s |
+[39m     [38;5;246m$L"; do…[39m
+
+[38;5;174m✢[39m [38;5;216mComposing…[38;5;174m [38;5;246m(50s · ↓[39m [38;5;246m2.4k tokens)[39m
+[38;5;246m  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's [39m
+     [38;5;246mcurrent work[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;220m⏵⏵ auto mode on[38;5;246m (shift+tab to cycle) · esc to interrupt · ← 1 agent[39m

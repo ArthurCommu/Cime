@@ -1,0 +1,56 @@
+/* Cime — pages Fil des échanges et Journal (après style.css). */
+
+/* Filtres */
+.filtres { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; }
+.filtre { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--secondaire); min-width: 0; }
+.filtre select {
+  background: var(--champ); color: var(--texte); border: 1px solid var(--bord-fort);
+  border-radius: var(--rayon-petit); padding: 8px 10px; min-height: 40px; max-width: 100%;
+}
+.filtre-case { flex-direction: row; align-items: center; gap: 8px; min-height: 40px; font-size: 14px; color: var(--texte-doux); }
+.filtre-case input { width: 18px; height: 18px; accent-color: var(--ambre); }
+
+/* Attentes en tête (repliable) */
+.attentes-fil {
+  background: var(--ambre-fond); border: 1px solid var(--ambre-bord); border-left: 3px solid var(--ambre);
+  border-radius: var(--rayon); padding: 0 14px;
+}
+.attentes-fil.a-rouge { border-left-width: 5px; }
+.attentes-fil summary { cursor: pointer; padding: 10px 0; font-weight: 600; color: var(--ambre); font-size: 14px; }
+.attentes-fil[open] summary { border-bottom: 1px solid var(--ambre-bord); }
+.attentes-fil summary .discret { font-weight: 400; font-size: 13px; }
+.attentes-groupe { padding: 8px 0 10px; }
+.attentes-groupe h4 { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--secondaire); }
+.attentes-groupe h4 a { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.attentes-groupe ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.attente-fil { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: baseline; font-size: 14px; }
+.attente-resume { font-size: 13px; flex: 1 1 18rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.fil-indispo {
+  margin: 0; padding: 12px 14px; border: 1px dashed var(--bord-fort);
+  border-radius: var(--rayon); background: var(--carte); color: var(--secondaire);
+}
+
+/* Journal */
+.journal-rappel { margin: 0; color: var(--secondaire); font-size: 14px; }
+.journal { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.journal-ligne {
+  background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon);
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 4px;
+}
+.journal-ligne.refuse { border-left: 3px solid var(--ambre); }
+.journal-ligne.erreur { border-left: 3px solid var(--rouge); }
+.journal-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 12px; }
+.journal-heure { color: var(--secondaire); }
+.journal-auteur { color: var(--texte-doux); }
+.res { font-size: 12px; font-weight: 600; color: var(--secondaire); }
+.res-refuse { color: var(--ambre); }
+.res-erreur { color: var(--rouge-clair); }
+.journal-action { font-size: 14px; }
+
+@media (min-width: 900px) {
+  .journal-ligne { flex-direction: row; align-items: baseline; gap: 18px; }
+  .journal-meta { flex: 0 0 380px; }
+  .journal-heure, .journal-auteur { white-space: nowrap; }
+  .journal-action { flex: 1; min-width: 0; }
+}

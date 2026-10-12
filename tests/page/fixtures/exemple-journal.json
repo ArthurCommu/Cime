@@ -1,0 +1,140 @@
+{
+  "lignes": [
+    {
+      "id": 11,
+      "horodatage": "2026-10-07T12:44:11.123Z",
+      "auteur": "utilisateur",
+      "action": "refuser",
+      "cible": "perm-d42",
+      "details": {
+        "agent": "worker-hote-serveur",
+        "outil": "Write",
+        "chemin": "src/cime/observation/tmux.py"
+      },
+      "resultat": "ok"
+    },
+    {
+      "id": 10,
+      "horodatage": "2026-10-07T11:44:11.123Z",
+      "auteur": "utilisateur",
+      "action": "autoriser",
+      "cible": "perm-d36",
+      "details": {
+        "agent": "coord-verification",
+        "outil": "Bash",
+        "commande": "git diff --stat main...equipe/observation"
+      },
+      "resultat": "ok"
+    },
+    {
+      "id": 9,
+      "horodatage": "2026-10-07T11:39:11.123Z",
+      "auteur": "utilisateur",
+      "action": "trancher",
+      "cible": "msg-60",
+      "details": {
+        "question": "Port du serveur local",
+        "choix": "8765"
+      },
+      "resultat": "erreur: registre verrouillé, écriture du message impossible"
+    },
+    {
+      "id": 8,
+      "horodatage": "2026-10-07T11:24:11.123Z",
+      "auteur": "assistant",
+      "action": "autoriser",
+      "cible": "perm-d38",
+      "details": {
+        "agent": "coord-hote",
+        "outil": "Bash",
+        "commande": "uv run pytest tests/hote -q"
+      },
+      "resultat": "refuse"
+    },
+    {
+      "id": 7,
+      "horodatage": "2026-10-07T10:24:11.123Z",
+      "auteur": "utilisateur",
+      "action": "deposer",
+      "cible": "msg-52",
+      "details": {
+        "fichier": ".orga/etapes.md",
+        "octets": 1184
+      },
+      "resultat": "ok"
+    },
+    {
+      "id": 6,
+      "horodatage": "2026-10-07T09:54:11.123Z",
+      "auteur": "utilisateur",
+      "action": "refuser",
+      "cible": "perm-d40",
+      "details": {
+        "agent": "worker-observation-git",
+        "outil": "Bash",
+        "commande": "git checkout main"
+      },
+      "resultat": "ok"
+    },
+    {
+      "id": 5,
+      "horodatage": "2026-10-07T09:06:11.123Z",
+      "auteur": "utilisateur",
+      "action": "autoriser",
+      "cible": "perm-d39",
+      "details": {
+        "agent": "coord-observation",
+        "outil": "Bash",
+        "commande": "tmux list-sessions"
+      },
+      "resultat": "ok"
+    },
+    {
+      "id": 4,
+      "horodatage": "2026-10-07T08:24:11.123Z",
+      "auteur": "utilisateur",
+      "action": "lu",
+      "cible": "msg-50",
+      "details": {
+        "rapport": ".orga/teams/fondation/reports/registre-2026-10-07.md"
+      },
+      "resultat": "ok"
+    },
+    {
+      "id": 3,
+      "horodatage": "2026-10-07T07:29:11.123Z",
+      "auteur": "utilisateur",
+      "action": "autoriser",
+      "cible": "perm-d37",
+      "details": {
+        "agent": "coord-fondation",
+        "outil": "Bash",
+        "commande": "uv run pytest tests/fondation -q"
+      },
+      "resultat": "ok"
+    },
+    {
+      "id": 2,
+      "horodatage": "2026-10-07T06:53:11.123Z",
+      "auteur": "utilisateur",
+      "action": "cloturer",
+      "cible": "equipe:cadrage",
+      "details": {
+        "demande": "msg-45"
+      },
+      "resultat": "ok"
+    },
+    {
+      "id": 1,
+      "horodatage": "2026-10-07T06:25:11.123Z",
+      "auteur": "utilisateur",
+      "action": "trancher",
+      "cible": "msg-31",
+      "details": {
+        "question": "Découpage en cinq équipes",
+        "choix": "validé"
+      },
+      "resultat": "ok"
+    }
+  ]
+}

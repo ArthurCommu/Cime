@@ -1,0 +1,183 @@
+{
+  "_origine": "variante de instantane-exemple.json : sources absentes (null)",
+  "version": 1,
+  "genere_a": "2026-10-07T13:04:11.123Z",
+  "duree_collecte_ms": 412,
+  "projet": {
+    "nom": "essai",
+    "racine": "/tmp/essai",
+    "prefixe": "cc-essai",
+    "branche_reference": "main",
+    "etapes": [
+      {
+        "nom": "v1 lecture",
+        "atteinte": true,
+        "date": "2026-10-09"
+      },
+      {
+        "nom": "v2 actions",
+        "atteinte": false,
+        "date": null
+      }
+    ]
+  },
+  "sources": [
+    {
+      "nom": "registre",
+      "ok": true
+    },
+    {
+      "nom": "tmux",
+      "ok": false,
+      "erreur": "tmux: no server running"
+    }
+  ],
+  "agents": [
+    {
+      "id": "utilisateur",
+      "role": "utilisateur",
+      "equipe": null,
+      "parent": null,
+      "session_tmux": null,
+      "vivant": true,
+      "etat": "inconnu",
+      "etat_depuis": "2026-10-07T13:00:00.000Z",
+      "etat_source": "hook:Stop",
+      "tache": null,
+      "derniere_phrase": "...",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 412000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": 3.12,
+      "brouillon": null
+    },
+    {
+      "id": "assistant",
+      "role": "assistant",
+      "equipe": null,
+      "parent": "utilisateur",
+      "session_tmux": "cc-essai-assistant",
+      "vivant": true,
+      "etat": "travaille",
+      "etat_depuis": "2026-10-07T13:00:00.000Z",
+      "etat_source": "hook:Stop",
+      "tache": "Coordonner",
+      "derniere_phrase": "...",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 412000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": 3.12,
+      "brouillon": null
+    },
+    {
+      "id": "coord-page",
+      "role": "coordinateur",
+      "equipe": "page",
+      "parent": "assistant",
+      "session_tmux": "cc-essai-coord-page",
+      "vivant": true,
+      "etat": "attend_autorisation",
+      "etat_depuis": "2026-10-07T13:00:00.000Z",
+      "etat_source": "hook:Stop",
+      "tache": "Page",
+      "derniere_phrase": "...",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 412000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": 3.12,
+      "brouillon": null
+    },
+    {
+      "id": "coord-hote",
+      "role": "coordinateur",
+      "equipe": "hote",
+      "parent": "assistant",
+      "session_tmux": "cc-essai-coord-hote",
+      "vivant": true,
+      "etat": "travaille",
+      "etat_depuis": "2026-10-07T13:00:00.000Z",
+      "etat_source": "hook:Stop",
+      "tache": "Hôte",
+      "derniere_phrase": "...",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 412000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": 3.12,
+      "brouillon": null
+    },
+    {
+      "id": "worker-hote-t1",
+      "role": "worker",
+      "equipe": "hote",
+      "parent": "coord-hote",
+      "session_tmux": "cc-essai-worker-hote-t1",
+      "vivant": true,
+      "etat": "travaille",
+      "etat_depuis": "2026-10-07T13:00:00.000Z",
+      "etat_source": "hook:Stop",
+      "tache": "t1-socle-serveur",
+      "derniere_phrase": "...",
+      "modele": "claude-sonnet-5-5",
+      "contexte": {
+        "tokens": 412000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": 3.12,
+      "brouillon": null
+    }
+  ],
+  "equipes": [
+    {
+      "nom": "page",
+      "mission": "...",
+      "speciale": false,
+      "statut": "bloquee",
+      "branche": "equipe/page",
+      "commit": "b7e92ed",
+      "worktree": "/tmp/essai-page",
+      "avancement": {
+        "faites": 3,
+        "en_cours": 1,
+        "a_faire": 2
+      },
+      "fichiers_touches": [],
+      "perimetre_declare": [],
+      "hors_perimetre": [],
+      "retard_sur_base": 0
+    },
+    {
+      "nom": "hote",
+      "mission": "...",
+      "speciale": false,
+      "statut": "active",
+      "branche": "equipe/hote",
+      "commit": "b7e92ed",
+      "worktree": "/tmp/essai-hote",
+      "avancement": {
+        "faites": 3,
+        "en_cours": 1,
+        "a_faire": 2
+      },
+      "fichiers_touches": [],
+      "perimetre_declare": [],
+      "hors_perimetre": [],
+      "retard_sur_base": 0
+    }
+  ],
+  "fil": null,
+  "attentes_utilisateur": null,
+  "alarmes": null
+}

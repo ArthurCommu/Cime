@@ -1,0 +1,24 @@
+[38;5;174m ▐[48;5;16m▛███▛█[39m[49m   [1mClaude Code[0m [38;5;246mv2.1.292[39m
+[38;5;174m▝▜[48;5;16m█████[49m█▀[39m  [38;5;246mOpus 5.5 · Claude Pro[39m
+[38;5;174m ▝▝   ▝▝ [39m  [38;5;246m~/projet[39m
+
+[38;5;220m⚠[39m [38;5;220mYour login expires in 3 days[38;5;246m · run /login to renew[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mLis le fichier de consigne puis commence ta mission.[39m
+
+[49m  [38;5;246mSearched for [1m1[0m[38;5;246m pattern, read [1m1[0m[38;5;246m file, listed [1m1[0m[38;5;246m directory, ran [1m1[0m[38;5;246m shell command [39m
+
+[38;5;231m⏺[39m Worker policy not yet acted. Now the specs.
+
+[38;5;246m⏺[39m Reading the spec
+[38;5;246m  ⎿  $ cd /home/exemple/projet/docs && cat [39m
+     [38;5;246mspec.md[39m
+
+[38;5;174m✢[39m [38;5;174mDeciph[38;5;216meri[38;5;174mng… [38;5;246m(51s · ↓[39m [38;5;246m1.2k tokens · [38;5;247mthinking[38;5;246m)[39m
+[38;5;246m  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's [39m
+     [38;5;246mcurrent work[39m
+
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[38;5;246m❯ [39m
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;220m⏵⏵ auto mode on[38;5;246m (shift+tab to cycle) · esc to interrupt · ← 1 agent[39m

@@ -1,0 +1,13 @@
+{
+  "session_id": "6b85d155-638b-4e90-8b70-3c53dcae0b2c",
+  "transcript_path": "/home/exemple/.claude/projects/-home-exemple-projet/6b85d155-638b-4e90-8b70-3c53dcae0b2c.jsonl",
+  "cwd": "/home/exemple/projet",
+  "scratchpad_dir": "/tmp/claude-1000/-home-exemple-projet/6b85d155-638b-4e90-8b70-3c53dcae0b2c/scratchpad",
+  "prompt_id": "25f8df49-a2c0-4977-af77-a573f531c9a8",
+  "permission_mode": "default",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "Voilà ! J'ai :\n1. **Listé lisme.txt** — contient \"hello\"\n2. **Écrit nouveau.txt** — avec le contenu 'salut'\n3. **Lancé ls** — montre les fichiers du répertoire, y compris le nouveau fichier créé",
+  "background_tasks": [],
+  "session_crons": []
+}

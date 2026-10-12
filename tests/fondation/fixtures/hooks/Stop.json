@@ -1,0 +1,13 @@
+{
+  "session_id": "7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8",
+  "transcript_path": "/home/exemple/.claude/projects/-tmp-exemple/7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8.jsonl",
+  "cwd": "/tmp/exemple",
+  "scratchpad_dir": "/tmp/claude-exemple/-tmp-exemple/7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8/scratchpad",
+  "prompt_id": "a03cede4-cffb-43b2-8b48-8bc9b1a05bb8",
+  "permission_mode": "default",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "Le fichier `a.txt` contient :\n```\ncontenu-de-a\n```\n\nC'est tout — une seule ligne avec le texte \"contenu-de-a\".",
+  "background_tasks": [],
+  "session_crons": []
+}

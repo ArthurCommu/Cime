@@ -1,0 +1,50 @@
+
+[38;5;246m  ⎿  [39mWrote [1m1[0m line to [1mb.txt[0m
+     [2m[38;5;231m 1 [0m[38;5;231mhello[39m
+
+[38;5;231m⏺[39m Done.
+
+[38;5;246m✻[39m [38;5;246mBrewed for 2s · done 1:09[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mUse the Edit tool to replace 'hello' by 'bonjour' in /private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/b.txt. Do nothing else.[39m
+
+[49m  [38;5;246mRead [1m1[0m[38;5;246m file [39m
+
+[38;5;231m⏺[39m Now I'll edit the file:
+
+[38;5;114m⏺[39m [1mUpdate[0m(]8;id=1xt8zri;file:///private/var/folders/hg/w4v7q78n09n0fd29kzkrf_n80000gn/T/tmp.6jBdiijTpS/b.txt\b.txt]8;;\)
+[38;5;246m  ⎿  [39mAdded [1m1[0m line, removed [1m1[0m line
+     [38;5;167m[48;5;52m 1 -[38;5;231mhello                                                                                                                                                                                   [39m[49m
+     [2m[38;5;231m 1 [0m[38;5;231m  No newline at end of file[39m
+     [38;5;77m[48;5;22m 2 +[38;5;231mbonjour                                                                                                                                                                                 [39m[49m
+     [2m[38;5;231m 3 [0m[38;5;231m  No newline at end of file[39m
+
+[38;5;231m⏺[39m Done.
+
+[38;5;246m✻[39m [38;5;246mSautéed for 5s · done 1:10[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mUse the WebFetch tool on https://example.com and tell me the page title. Do nothing else.[39m
+
+[38;5;114m[49m⏺[39m [1mFetch[0m(https://example.com)
+[38;5;246m  ⎿  [39mReceived [1m577 bytes[0m (200 OK)
+
+[38;5;231m⏺[39m The page title is "Example Domain".
+
+[38;5;246m✻[39m [38;5;246mBrewed for 5s · done 1:10[39m
+
+[38;5;246m[48;5;237m❯ [38;5;231mUse the Read tool on /etc/hosts and say how many lines it has. Do nothing else.[39m
+
+[38;5;246m[49m⏺[39m Reading /etc/hosts
+[38;5;246m  ⎿  /etc/hosts[39m
+
+[38;5;153m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;153mRead file[0m
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m Read(]8;id=1bvijq7;file:///etc/hosts\/etc/hosts]8;;\)
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m Do you want to proceed?
+ [38;5;153m❯[39m [38;5;246m1. [38;5;153mYes[39m
+   [38;5;246m2. [39mYes, allow reading from [1m/etc[0m and [1m/private/etc[0m during this session
+   [38;5;246m3. [39mNo
+
+ [38;5;246mEsc to cancel · Tab to amend[39m

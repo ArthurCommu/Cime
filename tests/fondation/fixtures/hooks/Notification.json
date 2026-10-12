@@ -1,0 +1,10 @@
+{
+  "session_id": "7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8",
+  "transcript_path": "/home/exemple/.claude/projects/-tmp-exemple/7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8.jsonl",
+  "cwd": "/tmp/exemple",
+  "scratchpad_dir": "/tmp/claude-exemple/-tmp-exemple/7c2ea28a-dc98-4f63-8d9a-cbdc102c3be8/scratchpad",
+  "prompt_id": "ac3cb190-18c6-4eb9-b5fa-bcc896dbfb30",
+  "hook_event_name": "Notification",
+  "message": "Claude needs your permission",
+  "notification_type": "permission_prompt"
+}

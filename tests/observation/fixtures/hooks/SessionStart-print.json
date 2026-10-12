@@ -1,0 +1,7 @@
+{
+  "session_id": "0f873312-b065-4812-9b6e-72c0ef89c3d3",
+  "transcript_path": "/home/exemple/.claude/projects/-home-exemple-projet/0f873312-b065-4812-9b6e-72c0ef89c3d3.jsonl",
+  "cwd": "/home/exemple/projet",
+  "hook_event_name": "SessionStart",
+  "source": "startup"
+}

@@ -1,0 +1,83 @@
+// La liste exacte des sprites que le moteur a le droit de référencer.
+// Un nom de cette liste absent de ATLAS.sprites est une erreur (testée).
+
+const ROLES = ["assistant", "coordinateur", "worker"];
+const ANIMS_AGENT = [
+  "idle",
+  "taper",
+  "ecrire",
+  "lire",
+  "executer",
+  "reflechir",
+  "dormir",
+  "sieste",
+  "attend_autorisation",
+  "attend_reponse",
+  "arrete",
+  "inconnu",
+  "arrive",
+  "fin_tache",
+];
+
+export const CATALOGUE = [
+  ...ROLES.flatMap((r) => ANIMS_AGENT.map((a) => `perso.${r}.${a}`)),
+  "perso.utilisateur.idle",
+  "perso.utilisateur.inconnu",
+
+  "perso.facteur.marche_haut",
+  "perso.facteur.marche_bas",
+  "perso.facteur.marche_gauche",
+  "perso.facteur.marche_droite",
+  "perso.facteur.idle",
+  "perso.facteur.dormir",
+  "perso.facteur.arrete",
+
+  "meuble.bureau",
+  "meuble.bureau_vide",
+  "meuble.chaise",
+  "ecran.eteint",
+  "ecran.texte",
+  "ecran.lecture",
+  "ecran.terminal",
+  "ecran.pensee",
+  "sol.piece",
+  "sol.couloir",
+  "mur.haut",
+  "mur.cote",
+  "mur.angle",
+  "porte.piece",
+  "porte.utilisateur.fermee",
+  "porte.utilisateur.attente",
+  "porte.utilisateur.agir",
+  "plante",
+  "panneau.equipe",
+  "machine.cafe",
+
+  "enveloppe.inscrit",
+  "enveloppe.livre",
+  "enveloppe.pris_en_compte",
+  "enveloppe.clos",
+  "enveloppe.echec",
+  "enveloppe.abandonne",
+  "enveloppe.echec_gris",
+  "enveloppe.abandonne_gris",
+
+  "bulle.exclamation",
+  "bulle.question",
+  "bulle.zzz",
+  "bulle.pensee",
+  "bulle.coche",
+  "icone.cout",
+  "icone.contexte",
+  "jauge.cadre",
+  "icone.inconnu",
+
+  "alerte.halo",
+  "alerte.refus_garde",
+  "alerte.sirene",
+  "attente.halo",
+  "attente.sirene",
+  "alerte.cause_inconnue",
+
+  "compteur.dossiers",
+];

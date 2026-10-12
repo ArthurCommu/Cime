@@ -1,0 +1,27 @@
+# Manifeste du projet. L'application ne connaît d'un projet que ce qu'il déclare ici.
+# Propre au projet : une mise à jour du socle n'y touche jamais.
+nom = "{{nom_projet}}"                  # affiché dans la page
+prefixe = "{{prefixe}}"                 # préfixe des sessions tmux de ce projet
+branche_reference = "{{branche_reference}}"
+branche_equipe = "equipe/{equipe}"      # convention de nommage des branches d'équipe
+worktree_equipe = ".orga/worktrees/{equipe}" # relatif à la racine du projet
+equipes_speciales = ["assistant", "verification"]
+modele_assistant = "{{modele_assistant}}"
+modele_coordinateur = "{{modele_coordinateur}}"
+
+[bac_a_sable]
+sites = []                              # sites permis aux commandes des agents (réseau)
+
+# Contrats que ce projet suit : une fusion qui touche `.orga/contracts/<nom>.schema.md` (ou son exemple)
+# signale chaque équipe lectrice. `<nom> = ["<équipe lectrice>", …]` ; vide : personne n'est signalé.
+[contrats]
+
+# Chemins que les fusions automatiques ne touchent jamais, en plus du noyau commun.
+[fusions_auto]
+reserves = []
+chantiers_par_jour = 5                  # lancements automatiques de chantier par 24 h ; 0 = sans plafond
+
+# Charge de la machine : nombre de workers actifs en même temps, tous projets confondus.
+# Un lancement de worker en trop n'est pas refusé : il attend qu'une place se libère.
+[charge]
+workers_max = 1
