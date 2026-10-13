@@ -23,5 +23,8 @@ chantiers_par_jour = 5                  # lancements automatiques de chantier pa
 
 # Charge de la machine : nombre de workers actifs en même temps, tous projets confondus.
 # Un lancement de worker en trop n'est pas refusé : il attend qu'une place se libère.
+# Un coordinateur sans rien à faire, au repos depuis ce nombre de minutes, est fermé (sa conversation
+# est gardée) et rouvert quand un message lui arrive ; 0 = jamais. L'Assistant n'est jamais fermé.
 [charge]
 workers_max = 1
+coordinateur_repos_minutes = 20

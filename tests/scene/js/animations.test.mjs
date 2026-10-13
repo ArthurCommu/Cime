@@ -1,7 +1,14 @@
 // Une ligne de test par ligne de la table « fait → animation », plus la sincérité et le rouge réservé aux problèmes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE, animationAgent, indexer } from '../../../src/cime/scene/static/animations.js';
+import { TABLE, ETATS_AGENT, animationAgent, indexer } from '../../../src/cime/scene/static/animations.js';
+import { construireScene } from '../../../src/cime/scene/static/modele.js';
+import { infobulle } from '../../../src/cime/scene/static/interaction.js';
+
+const scene0 = (over = {}) => ({
+  version: 2, agents: [], equipes: [], flux: [], ordres: [], alarmes: [], aretes: [], attentes_utilisateur: [],
+  facteur: { battement: 'x', age_s: 1, arrete: false }, ...over,
+});
 
 const agent = (over = {}) => ({
   id: 'coord-x', role: 'coordinateur', equipe: 'x', parent: 'assistant', vivant: true, etat: 'travaille',
@@ -195,4 +202,75 @@ test('sincérité : un agent non mesuré n’a jamais d’animation de travail',
   const a = anim(agent({ contexte: null, vivant: null, etat: 'travaille', activite: 'ecrire' }));
   assert.equal(a.sprite, 'perso.coordinateur.inconnu');
   assert.equal(a.ecran, null);
+});
+
+// Coordinateur endormi (repos, sans dette) : il se dessine comme au repos, ni inconnu ni arrêté.
+test('endormi : connu, ni inconnu ni arrêté, vivant: false compris', () => {
+  assert.ok(ETATS_AGENT.includes('endormi'));
+  const a = anim(agent({ etat: 'endormi', vivant: false, session_tmux: null }));
+  assert.notEqual(a.sprite, 'perso.coordinateur.inconnu');
+  assert.notEqual(a.raison, 6);
+  assert.notEqual(a.chaise, 'vide');
+});
+
+test('endormi : sprite dormir, bulle zzz, couleur normal, ligne 3', () => {
+  const a = anim(agent({ etat: 'endormi', vivant: false }));
+  assert.equal(a.sprite, 'perso.coordinateur.dormir');
+  assert.equal(a.bulle, 'zzz');
+  assert.equal(a.couleur, 'normal');
+  assert.equal(a.raison, 3);
+  assert.ok(a.raisons.includes(3));
+  assert.equal(a.ecran, null);
+});
+
+test('endormi : dessiné exactement comme au repos', () => {
+  const repos = anim(agent({ etat: 'au_repos' }));
+  const endormi = anim(agent({ etat: 'endormi', vivant: false }));
+  assert.deepEqual(endormi, repos);
+});
+
+test('endormi : aucun halo, rouge ni gris, même avec les alarmes de sa pièce à voir', () => {
+  const a = anim(agent({ etat: 'endormi', vivant: false }));
+  assert.equal(a.halo, null);
+  assert.equal(a.alerte, null);
+  assert.notEqual(a.couleur, 'rouge');
+  assert.notEqual(a.couleur, 'gris');
+  assert.equal(a.marque, null);
+});
+
+test('endormi : une alarme grave qui le nomme donne le halo rouge, comme pour tout agent (pas de cas particulier)', () => {
+  const a = anim(agent({ etat: 'endormi', vivant: false }), { alarmes: [alarme({ type: 'fige', gravite: 'grave', agents: ['coord-x'] })] });
+  assert.equal(a.halo, 'rouge');
+});
+
+test('endormi : garde son bureau et sa chaise', () => {
+  const a = anim(agent({ etat: 'endormi', vivant: false }));
+  assert.equal(a.bureau, 'plein');
+  assert.equal(a.chaise, 'occupee');
+});
+
+test('endormi : l’info-bulle dit « au repos », jamais la valeur brute', () => {
+  const scene = construireScene(scene0({
+    agents: [{ id: 'coord-x', role: 'coordinateur', equipe: 'x', vivant: false, etat: 'endormi', session_tmux: null, tache: null, contexte: null, cout_usd_estime: null, brouillon: null }],
+    equipes: [{ nom: 'x', statut: 'au_repos' }],
+  }), null, { t: 0 });
+  const info = infobulle(scene, 'agent', 'coord-x');
+  assert.equal(info.lignes[0], 'au repos');
+  assert.equal(JSON.stringify(info).includes('endormi'), false);
+});
+
+test('endormi : dans la scène, le coordinateur n’est pas replié et garde son poste', () => {
+  const scene = construireScene(scene0({
+    agents: [{ id: 'coord-x', role: 'coordinateur', equipe: 'x', vivant: false, etat: 'endormi', session_tmux: null, tache: null, contexte: null, cout_usd_estime: null, brouillon: null }],
+    equipes: [{ nom: 'x', statut: 'au_repos' }],
+  }), null, { t: 0 });
+  const a = scene.agents.find((g) => g.id === 'coord-x');
+  assert.ok(a, 'le coordinateur est dessiné');
+  assert.ok(a.bureauRect, 'il garde son bureau');
+  assert.equal(a.sprite, 'perso.coordinateur.dormir');
+  assert.equal(a.halo, null);
+  const piece = scene.pieces.find((p) => p.nom === 'x');
+  assert.ok(piece, 'la pièce de l’équipe existe');
+  assert.equal(piece.compteur ?? null, null, 'aucun compteur de repli');
+  assert.notEqual(piece.couleur, 'rouge');
 });

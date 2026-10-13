@@ -11,6 +11,7 @@ import textwrap
 import pytest
 
 from cime.fondation import lancer
+from cime.fondation import reglages as reglages_mod
 from cime.fondation.nom import VAR_AGENT, VAR_PROJET
 from cime.fondation.projet import ErreurProjet, lire_manifeste
 
@@ -61,8 +62,8 @@ def tmux(monkeypatch):
     monkeypatch.setattr(lancer, "DUREE_SURVEILLANCE", 0)
     # L'autotest d'import ne lance pas l'interpréteur de l'outil : ce serait un sous-processus
     # réel, et celui de la machine (pas celui du test) ; on lui rend ce que voit ce processus.
-    paquet = Path(lancer.os.path.realpath(lancer._paquet_cime()))
-    monkeypatch.setattr(lancer, "sonder_import_cime",
+    paquet = Path(lancer.os.path.realpath(reglages_mod._paquet_cime()))
+    monkeypatch.setattr(reglages_mod, "sonder_import_cime",
                         lambda python: (paquet, [str(paquet.parent)]))
     monkeypatch.setattr(lancer, "_session_existe", lambda s: s in etat["existantes"])
     reel = subprocess.run
@@ -95,7 +96,7 @@ def test_assistant(projet):
                    TMPDIR: str(projet / ".orga/etat/tmp")}
     assert ligne == [
         "claude", "--model", "modele-assistant", "--permission-mode", "auto",
-        "--settings", str(lancer.fichier_reglages_generes(projet, "assistant")),
+        "--settings", str(reglages_mod.fichier_reglages_generes(projet, "assistant")),
         "Lis .orga/teams/assistant/CLAUDE.md et commence ta mission."]
 
 
@@ -108,7 +109,7 @@ def test_coordinateur(projet):
                    TMPDIR: str(projet / ".orga/etat/tmp")}
     assert ligne == [
         "claude", "--model", "modele-coord", "--permission-mode", "auto",
-        "--settings", str(lancer.fichier_reglages_generes(projet, "coord-x")),
+        "--settings", str(reglages_mod.fichier_reglages_generes(projet, "coord-x")),
         "Lis CLAUDE.md puis mandate.md et commence ta mission."]
 
 
@@ -122,7 +123,7 @@ def test_worker(projet, tmp_path):
     en_cours = projet / ".orga/teams/x/tasks/in-progress/y.md"
     assert ligne == [
         "claude", "--model", HAIKU, "--permission-mode", "auto",
-        "--settings", str(lancer.fichier_reglages_generes(projet, "worker-x-y")),
+        "--settings", str(reglages_mod.fichier_reglages_generes(projet, "worker-x-y")),
         f"Lis {en_cours} et exécute-le."]
 
 
@@ -139,9 +140,9 @@ def test_worker_sans_modele(projet):
 def test_reglages_absents(projet):
     (projet / ".claude" / "settings-coordinateur.json").unlink()
     with pytest.raises(ErreurProjet, match="init"):
-        lancer.reglages(projet, "coord")
-    assert lancer.reglages(projet, "worker").name == "settings-agent.json"
-    assert lancer.reglages(projet, "assistant").name == "settings.json"
+        reglages_mod.fichier_reglages_statique(projet, "coord")
+    assert reglages_mod.fichier_reglages_statique(projet, "worker").name == "settings-agent.json"
+    assert reglages_mod.fichier_reglages_statique(projet, "assistant").name == "settings.json"
 
 
 @pytest.mark.parametrize("equipe,tache", [("X", "y"), ("x_1", "y"), ("x", "Y!"), ("x/..", "y")])
@@ -244,7 +245,7 @@ def test_integration_commande(projet, integration):
     assert ligne == [
         "env", "-u", VAR_AGENT, "-u", VAR_PROJET,
         "claude", "--model", HAIKU, "--permission-mode", "auto",
-        "--settings", str(lancer.fichier_reglages_generes(projet, "worker-integration-r1")),
+        "--settings", str(reglages_mod.fichier_reglages_generes(projet, "worker-integration-r1")),
         f"Lis {integration / 'requests/todo/r1.md'} et traite-la."]
 
 
@@ -457,7 +458,7 @@ def test_reprise_commande(projet):
                    TMPDIR: str(projet / ".orga/etat/tmp")}
     assert ligne == [
         "claude", "--model", HAIKU, "--permission-mode", "auto",
-        "--settings", str(lancer.fichier_reglages_generes(projet, "coord-x")),
+        "--settings", str(reglages_mod.fichier_reglages_generes(projet, "coord-x")),
         "--resume", "abc-123"]
 
 
@@ -708,24 +709,24 @@ def test_ecran_d_approbation_agent_message_inchange(attache, monkeypatch, capsys
 def test_autotest_import_refuse_le_lancement_sans_rien_ecrire(projet, monkeypatch, tmux, capsys):
     # une source de cime que les lectures générées ne couvrent pas : refus, code 2
     perdu = Path.home().resolve() / "ailleurs-introuvable" / "src"
-    monkeypatch.setattr(lancer, "sonder_import_cime", lambda python: (perdu / "cime", [str(perdu)]))
+    monkeypatch.setattr(reglages_mod, "sonder_import_cime", lambda python: (perdu / "cime", [str(perdu)]))
     monkeypatch.setattr(Path, "exists", lambda self: True if self == perdu else
                         Path.is_dir(self) or Path.is_file(self))
     assert lancer.executer(_args("worker", "x", "y", HAIKU)) == lancer.CODE_REFUS
     assert "n'est pas couverte par les lectures de l'agent" in capsys.readouterr().err
     assert (projet / ".orga/teams/x/tasks/todo/y.md").is_file()
-    assert not lancer.fichier_reglages_generes(projet, "worker-x-y").exists()
+    assert not reglages_mod.fichier_reglages_generes(projet, "worker-x-y").exists()
     assert tmux["appels"] == []
 
 
 def test_essai_a_blanc_imprime_le_verdict_statique_sans_rien_lancer(projet, monkeypatch, tmux, capsys):
     # le sys.path de ce processus de test (venv du dépôt) n'est pas celui d'un outil installé
-    monkeypatch.setattr(lancer.sys, "path", [str(Path(lancer._paquet_cime()).parent)])
+    monkeypatch.setattr(lancer.sys, "path", [str(Path(reglages_mod._paquet_cime()).parent)])
     assert lancer.executer(_args("worker", "x", "y", HAIKU, blanc=True)) == 0
     sortie = capsys.readouterr().out
     assert "autotest import cime (statique) : ok" in sortie
     assert tmux["appels"] == []
-    assert not lancer.fichier_reglages_generes(projet, "worker-x-y").exists()
+    assert not reglages_mod.fichier_reglages_generes(projet, "worker-x-y").exists()
 
 
 # --- reprise d'une tâche orpheline ------------------------------------------------------------

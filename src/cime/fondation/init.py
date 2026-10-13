@@ -13,7 +13,9 @@ from pathlib import Path
 
 from cime.fondation import lancer, registre
 from cime.fondation.nom import NOM, VAR_AGENT, VAR_PROJET
-from cime.fondation.reglages import fusionner, reglages
+from cime.fondation.reglages import (
+    dossier_essais, dossier_memoire, dossier_tmp, fusionner, preparer_tmp, reglages,
+)
 
 BRANCHE_REFERENCE = "main"
 MODELE = "claude-opus-5-5"
@@ -260,9 +262,9 @@ def planifier(args, executable: str | None) -> Plan:
         rapport["ajouté"].append(str(relatif))
     _plan_gitignore(plan)
     for chemin, libelle in ((dossier / ".orga" / "etat" / "registre.sqlite", None),
-                            (lancer.dossier_tmp(dossier), ".orga/etat/tmp (0o700)"),
-                            (lancer.dossier_memoire(dossier), ".orga/etat/memoire"),
-                            (lancer.dossier_essais(dossier), ".orga/etat/essais"),
+                            (dossier_tmp(dossier), ".orga/etat/tmp (0o700)"),
+                            (dossier_memoire(dossier), ".orga/etat/memoire"),
+                            (dossier_essais(dossier), ".orga/etat/essais"),
                             (dossier / ".orga" / "worktrees", ".orga/worktrees")):
         existe = chemin.exists() if libelle is None else chemin.is_dir()
         rapport["déjà présent" if existe else "ajouté"].append(
@@ -309,9 +311,9 @@ def installer(args) -> dict[str, list[str]]:
             rapport["migration"].append(
                 f"sauvegarde du registre : .orga/etat/{migration.SAUVEGARDE}")
     registre.ouvrir(dossier).close()
-    lancer.preparer_tmp(dossier)
-    lancer.dossier_memoire(dossier).mkdir(parents=True, exist_ok=True)
-    lancer.dossier_essais(dossier).mkdir(parents=True, exist_ok=True)
+    preparer_tmp(dossier)
+    dossier_memoire(dossier).mkdir(parents=True, exist_ok=True)
+    dossier_essais(dossier).mkdir(parents=True, exist_ok=True)
     (dossier / ".orga" / "worktrees").mkdir(parents=True, exist_ok=True)
     for fichier, texte in plan.ecritures_reglages:
         fichier.parent.mkdir(parents=True, exist_ok=True)

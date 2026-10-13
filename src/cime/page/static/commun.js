@@ -39,6 +39,8 @@ export function derniereVisite(etat) {
 export const ETATS_AGENT = {
   travaille: { mot: 'travaille', ton: 'vert' },
   au_repos: { mot: 'au repos', ton: 'gris' },
+  // un coordinateur endormi n'est pas arrêté : sa session est fermée volontairement et rouverte au prochain message
+  endormi: { mot: 'endormi', ton: 'gris' },
   attend_autorisation: { mot: 'attend une autorisation', ton: 'ambre' },
   attend_reponse: { mot: 'attend une réponse', ton: 'ambre' },
   arrete: { mot: 'à l’arrêt', ton: 'gris' },
@@ -341,6 +343,7 @@ export function libelleEffectifs(compte) {
   const morceaux = [
     mot(n('travaille'), 'travaille', 'travaillent'),
     n('au_repos') ? mot(n('au_repos'), 'au repos', 'au repos') : null,
+    n('endormi') ? mot(n('endormi'), 'endormi', 'endormis') : null,
     n('attend') ? mot(n('attend'), 'attend', 'attendent') : null,
     n('a_l_arret') ? `${n('a_l_arret')}\u00A0à l’arrêt` : null,
     n('inconnu') ? mot(n('inconnu'), 'inconnu', 'inconnus') : null,
@@ -531,6 +534,9 @@ export function carteAgent(agent, ctx, options = {}) {
   let session = null;
   if (agent.vivant === null) {
     session = inconnuCourt('session', sourceEnEchec(ctx.etat, 'tmux'));
+  } else if (etatCle === 'endormi') {
+    session = el('div', { class: 'agent-session endormi' }, 'pas de terminal : endormi ', age(agent.etat_depuis, 'depuis'),
+      ' · il se réveille au prochain message');
   } else if (agent.vivant === false) {
     session = el('div', { class: 'agent-session absente' }, `session absente${agent.session_tmux ? ` (${agent.session_tmux})` : ''}`);
   }

@@ -1,0 +1,61 @@
+{
+  "marque": "coord",
+  "permissions": {
+    "allow": [
+      "Bash(ls*)"
+    ],
+    "deny": [
+      "Bash(git add*)",
+      "Bash(rtk git add*)",
+      "Bash(git -C * add*)",
+      "Bash(rtk git -C * add*)",
+      "Bash(git commit*)",
+      "Bash(rtk git commit*)",
+      "Bash(git -C * commit*)",
+      "Bash(rtk git -C * commit*)",
+      "Bash(git merge*)",
+      "Bash(rtk git merge*)",
+      "Bash(git -C * merge*)",
+      "Bash(rtk git -C * merge*)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "denyRead": [
+        "<RACINE>/maison"
+      ],
+      "allowRead": [
+        "<RACINE>/depot",
+        "<RACINE>/maison/.gitconfig",
+        "<RACINE>/maison/.config/git",
+        "<RACINE>/maison/.local/share/uv/python",
+        "<RACINE>/maison/.local/bin",
+        "<RACINE>/maison/.cache/uv",
+        "<RACINE>/outil",
+        "<RACINE>/source/src"
+      ],
+      "allowWrite": [
+        "<RACINE>/depot/.orga/teams/integration",
+        "<RACINE>/depot/.orga/teams/integration/requests",
+        "<RACINE>/depot/.orga/etat/tmp",
+        "<RACINE>/depot/.orga/etat/memoire/worker-integration-r1",
+        "<RACINE>/depot/.orga/worktrees/integration",
+        "<RACINE>/depot/.orga/etat/essais",
+        "<RACINE>/maison/.cache/uv",
+        "<RACINE>/maison/.local/share/uv/python"
+      ]
+    },
+    "network": {
+      "allowLocalBinding": true,
+      "allowedDomains": [
+        "b.example",
+        "a.example"
+      ]
+    }
+  },
+  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/worker-integration-r1"
+}

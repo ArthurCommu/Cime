@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from cime.fondation import init, lancer
+from cime.fondation import reglages as reglages_mod
 from cime.fondation.nom import VAR_AGENT, VAR_PROJET
 from cime.fondation.projet import ErreurProjet, lire_manifeste, worktree_equipe
 from cime.fondation.reglages import (
@@ -67,7 +68,7 @@ def projet(tmp_path, monkeypatch, maison):
     _git(racine, "commit", "-qm", "init")
     _git(racine, "worktree", "add", "-q", "-b", "equipe/x", str(racine / ".orga/worktrees/x"))
     monkeypatch.chdir(racine)
-    monkeypatch.setattr(lancer, "dossier_outil", lambda: None)  # PATH réel hors des tests
+    monkeypatch.setattr(reglages_mod, "dossier_outil", lambda: None)  # PATH réel hors des tests
     return racine
 
 
@@ -221,7 +222,7 @@ def test_init_produit_un_manifeste_lisible(tmp_path, monkeypatch):
 
 def test_lancer_ecrit_le_fichier_genere(projet, tmux, maison, tmp_path):
     assert lancer.executer(_args("worker", "x", "y", HAIKU)) == 0
-    fichier = lancer.fichier_reglages_generes(projet, "worker-x-y")
+    fichier = reglages_mod.fichier_reglages_generes(projet, "worker-x-y")
     assert fichier == projet / ".orga" / "etat" / "reglages" / "worker-x-y.json"
     contenu = json.loads(fichier.read_text(encoding="utf-8"))
     # le contenu statique du rôle (worker = agent) est conservé
@@ -243,7 +244,7 @@ def test_lancer_relit_les_sites_du_manifeste(projet, tmux):
     with open(projet / ".orga" / "projet.toml", "a", encoding="utf-8") as f:
         f.write('\n[bac_a_sable]\nsites = ["pypi.org"]\n')
     assert lancer.executer(_args("worker", "x", "y", HAIKU)) == 0
-    contenu = json.loads(lancer.fichier_reglages_generes(projet, "worker-x-y").read_text())
+    contenu = json.loads(reglages_mod.fichier_reglages_generes(projet, "worker-x-y").read_text())
     assert contenu["sandbox"]["network"]["allowedDomains"] == ["pypi.org"]
 
 
@@ -257,7 +258,7 @@ def test_lancer_pose_le_dossier_tmp_prive(projet, tmux):
 
 def test_essai_a_blanc_n_ecrit_rien(projet, tmux, capsys):
     assert lancer.executer(_args("worker", "x", "y", HAIKU, blanc=True)) == 0
-    assert str(lancer.fichier_reglages_generes(projet, "worker-x-y")) in capsys.readouterr().out
+    assert str(reglages_mod.fichier_reglages_generes(projet, "worker-x-y")) in capsys.readouterr().out
     assert not (projet / ".orga" / "etat").exists()
     assert tmux["appels"] == []
 
@@ -270,12 +271,12 @@ def test_essai_a_blanc_n_ecrit_rien(projet, tmux, capsys):
 def test_fichier_statique_choisi_par_role(projet, role, equipe, tache, marque):
     identite = lancer._identite(role, equipe, tache)
     m = lire_manifeste(projet)
-    fichier = lancer.ecrire_reglages_generes(projet, identite, role, m)
+    fichier = reglages_mod.ecrire_reglages_generes(projet, identite, role, m)
     assert json.loads(fichier.read_text())["marque"] == marque
 
 
 def _ecriture(projet, identite, role, integration=False):
-    fichier = lancer.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet),
+    fichier = reglages_mod.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet),
                                              integration=integration)
     return json.loads(fichier.read_text())["sandbox"]["filesystem"]["allowWrite"]
 
@@ -293,7 +294,7 @@ def test_zones_ecriture_par_identite(projet):
 def test_assistant_hors_bac_a_sable(projet):
     """Décision de l'utilisateur : l'Assistant ne tourne pas dans le bac à sable. Pas de `sandbox`,
     mais les autres réglages du rôle commun restent (hooks, permissions, mémoire, tmp)."""
-    fichier = lancer.ecrire_reglages_generes(projet, "assistant", "assistant",
+    fichier = reglages_mod.ecrire_reglages_generes(projet, "assistant", "assistant",
                                              lire_manifeste(projet))
     contenu = json.loads(fichier.read_text(encoding="utf-8"))
     assert "sandbox" not in contenu
@@ -305,7 +306,7 @@ def test_assistant_hors_bac_a_sable(projet):
 def test_assistant_garde_le_statique_de_son_role(projet):
     """Hooks et permissions de `settings.json` passent telles quels à l'Assistant."""
     statique = json.loads((projet / ".claude" / "settings.json").read_text())
-    fichier = lancer.ecrire_reglages_generes(projet, "assistant", "assistant",
+    fichier = reglages_mod.ecrire_reglages_generes(projet, "assistant", "assistant",
                                              lire_manifeste(projet))
     contenu = json.loads(fichier.read_text(encoding="utf-8"))
     assert contenu["permissions"] == statique["permissions"] == {
@@ -318,7 +319,7 @@ def test_assistant_garde_le_statique_de_son_role(projet):
     ("coord", "worker-integration-r1", True),
 ])
 def test_agents_gardent_leur_bac_a_sable(projet, role, identite, integration):
-    fichier = lancer.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet),
+    fichier = reglages_mod.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet),
                                              integration=integration)
     contenu = json.loads(fichier.read_text(encoding="utf-8"))
     assert contenu["sandbox"]["enabled"] is True
@@ -343,36 +344,36 @@ def _faux_environnement(tmp_path):
 
 def test_racine_de_l_outil_remonte_jusqu_au_pyvenv(tmp_path):
     env, cible, _ = _faux_environnement(tmp_path)
-    assert lancer.racine_de_l_outil(cible.resolve()) == env.resolve()
+    assert reglages_mod.racine_de_l_outil(cible.resolve()) == env.resolve()
 
 
 def test_racine_de_l_outil_sans_pyvenv_prend_le_dossier_de_la_cible(tmp_path):
     (tmp_path / "nu" / "bin").mkdir(parents=True)
     cible = tmp_path / "nu" / "bin" / "cime"
     cible.write_text("")
-    assert lancer.racine_de_l_outil(cible) == tmp_path / "nu" / "bin"
+    assert reglages_mod.racine_de_l_outil(cible) == tmp_path / "nu" / "bin"
 
 
 def test_dossier_outil_resout_le_lien_par_which(tmp_path, monkeypatch, maison):
     env, _, lien = _faux_environnement(tmp_path)
-    monkeypatch.setattr(lancer.shutil, "which", lambda nom: str(lien))
-    assert lancer.dossier_outil() == env.resolve()
+    monkeypatch.setattr(reglages_mod.shutil, "which", lambda nom: str(lien))
+    assert reglages_mod.dossier_outil() == env.resolve()
 
 
 def test_dossier_outil_jamais_la_maison(tmp_path, monkeypatch, maison):
     """Un exécutable posé directement dans la maison ne rouvre pas la maison entière."""
     cible = maison / "cime"
     cible.write_text("")
-    monkeypatch.setattr(lancer.shutil, "which", lambda nom: str(cible))
-    assert lancer.dossier_outil() is None
+    monkeypatch.setattr(reglages_mod.shutil, "which", lambda nom: str(cible))
+    assert reglages_mod.dossier_outil() is None
 
 
 def test_dossier_outil_sans_which_se_rabat_sur_python(tmp_path, monkeypatch, maison):
     env, cible, _ = _faux_environnement(tmp_path)
-    monkeypatch.setattr(lancer.shutil, "which", lambda nom: None)
-    monkeypatch.setattr(lancer.sys, "argv", ["cime"])
-    monkeypatch.setattr(lancer.sys, "executable", str(cible))
-    assert lancer.dossier_outil() == env.resolve()
+    monkeypatch.setattr(reglages_mod.shutil, "which", lambda nom: None)
+    monkeypatch.setattr(reglages_mod.sys, "argv", ["cime"])
+    monkeypatch.setattr(reglages_mod.sys, "executable", str(cible))
+    assert reglages_mod.dossier_outil() == env.resolve()
 
 
 def test_outil_dans_le_projet_n_ajoute_rien(projet):
@@ -386,11 +387,11 @@ def test_outil_dans_le_projet_n_ajoute_rien(projet):
 
 def test_outil_hors_projet_ajoute_une_fois_en_lecture(projet, tmp_path, monkeypatch):
     env, _, _ = _faux_environnement(tmp_path)
-    monkeypatch.setattr(lancer, "dossier_outil", lambda: env.resolve())
+    monkeypatch.setattr(reglages_mod, "dossier_outil", lambda: env.resolve())
     for role, identite, integration in (("coord", "coord-x", False),
                                         ("worker", "worker-x-y", False),
                                         ("coord", "worker-integration-r1", True)):
-        fichier = lancer.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet),
+        fichier = reglages_mod.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet),
                                                  integration=integration)
         filesystem = json.loads(fichier.read_text())["sandbox"]["filesystem"]
         assert filesystem["allowRead"].count(str(env.resolve())) == 1, identite
@@ -606,7 +607,7 @@ def test_reprise_assistant_pose_identite_et_projet_dans_la_commande_tmux(projet,
 # --- le droit de commit du coordinateur dans le worktree de son équipe -----------
 
 def _allow(projet, identite, role):
-    fichier = lancer.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet))
+    fichier = reglages_mod.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet))
     return json.loads(fichier.read_text())["permissions"]["allow"]
 
 
@@ -640,7 +641,7 @@ def test_integration_ne_commite_ni_ne_fusionne_jamais(projet):
     """Registre 2.0 : la session d'intégration n'écrit pas le projet. Ses réglages refusent
     `git add`, `git commit` et `git merge`, avec ou sans `-C` (un `deny` l'emporte sur tout `allow`)."""
     m = lire_manifeste(projet)
-    integration = json.loads(lancer.ecrire_reglages_generes(
+    integration = json.loads(reglages_mod.ecrire_reglages_generes(
         projet, "worker-integration-r1", "coord", m, integration=True).read_text())
     deny = integration["permissions"]["deny"]
     for verbe in ("add", "commit", "merge"):
@@ -648,6 +649,6 @@ def test_integration_ne_commite_ni_ne_fusionne_jamais(projet):
                       f"Bash(rtk git {verbe}*)", f"Bash(rtk git -C * {verbe}*)"):
             assert regle in deny, regle
     # un coordinateur d'équipe, lui, garde son droit de commit : la règle ne le touche pas
-    coord = json.loads(lancer.ecrire_reglages_generes(projet, "coord-x", "coord", m).read_text())
+    coord = json.loads(reglages_mod.ecrire_reglages_generes(projet, "coord-x", "coord", m).read_text())
     assert not any(r.startswith(("Bash(git add", "Bash(git commit", "Bash(git merge"))
                    for r in coord["permissions"]["deny"])

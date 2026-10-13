@@ -60,6 +60,9 @@ class Manifeste:
     contrats: dict[str, list[str]] = field(default_factory=dict)
     # workers actifs en même temps sur la machine : `[charge] workers_max`, optionnel, au moins 1
     workers_max: int = 1
+    # minutes de repos après lesquelles un coordinateur sans dette est fermé : `[charge]
+    # coordinateur_repos_minutes`, optionnel, 0 = jamais
+    coordinateur_repos_minutes: int = 20
 
 
 def _contrats(donnees: dict, fichier: Path) -> dict[str, list[str]]:
@@ -86,14 +89,26 @@ def _sites(donnees: dict, fichier: Path) -> list[str]:
     return sites
 
 
-def _workers_max(donnees: dict, fichier: Path) -> int:
+def _table_charge(donnees: dict, fichier: Path) -> dict:
     table = donnees.get("charge", {})
     if not isinstance(table, dict):
         raise ErreurProjet(f"[charge] doit être une table ({fichier})")
-    valeur = table.get("workers_max", 1)
+    return table
+
+
+def _workers_max(donnees: dict, fichier: Path) -> int:
+    valeur = _table_charge(donnees, fichier).get("workers_max", 1)
     if isinstance(valeur, bool) or not isinstance(valeur, int) or valeur < 1:
         raise ErreurProjet(
             f"charge.workers_max doit être un entier au moins égal à 1 ({fichier})")
+    return valeur
+
+
+def _coordinateur_repos_minutes(donnees: dict, fichier: Path) -> int:
+    valeur = _table_charge(donnees, fichier).get("coordinateur_repos_minutes", 20)
+    if isinstance(valeur, bool) or not isinstance(valeur, int) or valeur < 0:
+        raise ErreurProjet(
+            f"charge.coordinateur_repos_minutes doit être un entier au moins égal à 0 ({fichier})")
     return valeur
 
 
@@ -108,7 +123,7 @@ def lire_manifeste(projet: Path) -> Manifeste:
         raise ErreurProjet(f"manifeste illisible ({fichier}) : {e}") from None
     valeurs = {}
     for champ in fields(Manifeste):
-        if champ.name in ("sites", "contrats", "workers_max"):
+        if champ.name in ("sites", "contrats", "workers_max", "coordinateur_repos_minutes"):
             continue
         if champ.name not in donnees:
             raise ErreurProjet(
@@ -118,6 +133,7 @@ def lire_manifeste(projet: Path) -> Manifeste:
     valeurs["sites"] = _sites(donnees, fichier)
     valeurs["contrats"] = _contrats(donnees, fichier)
     valeurs["workers_max"] = _workers_max(donnees, fichier)
+    valeurs["coordinateur_repos_minutes"] = _coordinateur_repos_minutes(donnees, fichier)
     return Manifeste(**valeurs)
 
 

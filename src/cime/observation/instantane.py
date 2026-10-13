@@ -125,6 +125,7 @@ def instantane(projet: Path, maintenant: datetime | None = None, *, complet: boo
             return res, src, depuis, conso
 
         agents_reg = reg["agents"] if reg is not None else {}
+        endormis = reg["endormis"] if reg is not None else {}
         cwds = [s.get("cwd") for s in (sessions or {}).values() if s.get("cwd")]
         cwd_de = {s["identite"]: s["cwd"] for s in (sessions or {}).values()
                   if s.get("identite") and s.get("cwd") and cwds.count(s["cwd"]) == 1}
@@ -188,7 +189,9 @@ def instantane(projet: Path, maintenant: datetime | None = None, *, complet: boo
         vivant = (session in sessions) if tmux_ok and session else None
         r = agents_reg.get(aid)
         dernier = r["dernier_evenement"] if r else None
-        if dernier and dernier["evenement"] == "SessionEnd":
+        if role == "coordinateur" and vivant is False and aid in endormis:
+            etat, depuis, source = "endormi", endormis[aid], "registre:CoordEndormi"
+        elif dernier and dernier["evenement"] == "SessionEnd":
             etat, depuis, source = "arrete", dernier["horodatage"], "hook:SessionEnd"
         elif tmux_ok and vivant is False and role != "assistant":  # l'Assistant peut vivre hors tmux
             etat, depuis, source = "arrete", dernier["horodatage"] if dernier else None, "tmux:session_absente"
@@ -269,7 +272,7 @@ def instantane(projet: Path, maintenant: datetime | None = None, *, complet: boo
         elif any(a["etat"] == "travaille" or (a["role"] == "worker" and a["vivant"] is True)
                  for a in membres):
             statut = "active"
-        elif membres and all(a["etat"] in ("au_repos", "arrete") for a in membres):
+        elif membres and all(a["etat"] in ("au_repos", "arrete", "endormi") for a in membres):
             statut = "au_repos"
         else:
             statut = None  # état non mesuré : la page affiche « non mesuré »

@@ -1,0 +1,49 @@
+{
+  "marque": "coord",
+  "permissions": {
+    "allow": [
+      "Bash(ls*)",
+      "Bash(git -C <RACINE>/depot/.orga/worktrees/z add*)",
+      "Bash(git -C <RACINE>/depot/.orga/worktrees/z commit*)"
+    ],
+    "deny": []
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "denyRead": [
+        "<RACINE>/maison"
+      ],
+      "allowRead": [
+        "<RACINE>/depot",
+        "<RACINE>/maison/.gitconfig",
+        "<RACINE>/maison/.config/git",
+        "<RACINE>/maison/.local/share/uv/python",
+        "<RACINE>/maison/.local/bin",
+        "<RACINE>/maison/.cache/uv",
+        "<RACINE>/outil",
+        "<RACINE>/source/src"
+      ],
+      "allowWrite": [
+        "<RACINE>/depot/.orga/teams/z",
+        "<RACINE>/depot/.orga/teams/integration/requests",
+        "<RACINE>/depot/.orga/etat/tmp",
+        "<RACINE>/depot/.orga/etat/memoire/coord-z",
+        "<RACINE>/depot/.orga/worktrees/z",
+        "<RACINE>/maison/.cache/uv",
+        "<RACINE>/maison/.local/share/uv/python"
+      ]
+    },
+    "network": {
+      "allowLocalBinding": true,
+      "allowedDomains": [
+        "b.example",
+        "a.example"
+      ]
+    }
+  },
+  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/coord-z"
+}

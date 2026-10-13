@@ -53,6 +53,7 @@ const LIBELLE_STATUT_PIECE = { lumiere: 'active', tamisee: 'au repos', attend: '
 const LIBELLE_ETAT_AGENT = {
   travaille: 'travaille',
   au_repos: 'au repos',
+  endormi: 'au repos',
   attend_reponse: 'attend une réponse',
   attend_autorisation: 'attend une autorisation',
   inconnu: 'non mesuré',

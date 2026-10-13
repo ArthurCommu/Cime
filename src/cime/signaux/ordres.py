@@ -5,7 +5,8 @@ Appelés à la main par l'utilisateur (`appelant() == "utilisateur"`), `lancer`,
 `voir` s'exécutent directement, par les mêmes fonctions d'exécution que le facteur.
 
 Une tâche orpheline (fiche dans `in-progress/`, ni session ni processus) se relance par le même
-ordre `lancer`, sur le même accord : l'ordre porte alors `reprise: true`.
+ordre `lancer`, sur le même accord : l'ordre porte alors `reprise: true`. Un coordinateur endormi se
+réveille par le même ordre, posé par le facteur : il porte `reveil: true`.
 """
 import argparse
 import contextlib
@@ -18,7 +19,7 @@ from pathlib import Path
 
 from cime.fondation.projet import ErreurProjet, lire_manifeste, session_tmux
 from cime.fondation.registre import horodatage, inscrire_transition, ouvrir
-from cime.signaux import commandes, obligations
+from cime.signaux import commandes, obligations, repos
 from cime.signaux.commandes import Refus
 
 ATTENTE_ORDRE = 30.0
@@ -90,16 +91,25 @@ def attendre_resultat(projet, identifiant, delai=None):
         _dormir(min(PAS_ATTENTE, max(fin - time.monotonic(), 0)))
 
 
+def _attente(identifiant, projet) -> str:
+    """Pourquoi un ordre reste en file. Le compte vient de tmux ou, depuis un agent, du facteur."""
+    if projet is not None and _lancement_de_worker_en_file(projet, identifiant):
+        actifs, plafond, _ = charge_machine(projet)
+        if actifs is not None and actifs >= plafond:
+            return (f"ordre #{identifiant} en file : {actifs} workers actifs sur la machine "
+                    f"(plafond {plafond}) — il partira quand une place se libère")
+    if projet is not None:
+        from cime.lanceur.surveillant import battement_frais
+        if battement_frais(Path(projet)):
+            return f"ordre #{identifiant} en file : le facteur est actif, il partira à son tour"
+    return f"ordre #{identifiant} en file, facteur arrêté"
+
+
 def _issue(identifiant, resultat, projet=None) -> int:
     """Code de sortie d'une commande qui a posé un ordre, d'après son résultat. Avec `projet`,
-    une attente due au plafond de workers le dit au lieu d'accuser le facteur."""
+    une attente due au plafond de workers le dit, et un facteur qui bat n'est pas accusé."""
     if resultat is None:
-        if projet is not None and _retenu_par_le_plafond(projet, identifiant):
-            _, actifs, plafond = plafond_atteint(projet)
-            print(f"ordre #{identifiant} en file : {actifs} workers actifs sur la machine "
-                  f"(plafond {plafond}) — il partira quand une place se libère")
-        else:
-            print(f"ordre #{identifiant} en file, facteur arrêté")
+        print(_attente(identifiant, projet))
         return CODE_EN_FILE
     if resultat["texte"]:
         print(resultat["texte"])
@@ -128,14 +138,20 @@ def _fermer_pour_remplacer(projet, p) -> None:
     """`--remplacer` : le facteur ferme la session du coordinateur (seul à toucher tmux), puis
     attend la fin du processus claude pour que la reprise ne s'y heurte pas. Idempotent : sans
     session, il n'y a rien à fermer et l'ordre se réduit à `--reprendre`."""
-    from cime.fondation import lancer
     session = session_tmux(lire_manifeste(projet), p["cible"])
     if session is None or _tmux("has-session", "-t", f"={session}").returncode != 0:
         return
     r = _tmux("kill-session", "-t", f"={session}")
     if r.returncode != 0:
         raise ErreurProjet(f"fermeture de la session {session} impossible : {r.stderr.strip()}")
-    dossier = lancer._dossier_equipe(projet, p["equipe"])
+    _attendre_fin_du_processus(projet, p["equipe"])
+
+
+def _attendre_fin_du_processus(projet, equipe) -> None:
+    """Attend (au plus `ATTENTE_FIN_PROCESSUS`) que plus aucun processus claude ne tourne dans le
+    dossier de l'équipe : la reprise d'une conversation s'y heurterait."""
+    from cime.fondation import lancer
+    dossier = lancer._dossier_equipe(projet, equipe)
     for _ in range(int(ATTENTE_FIN_PROCESSUS / PAS_ATTENTE)):
         if not lancer.processus_claude_dans(dossier):
             return
@@ -149,6 +165,8 @@ def _executer_lancer(projet, ordre_id, p):
             _fermer_pour_remplacer(projet, p)
         except ErreurProjet as e:
             return "echec", 1, str(e)
+    if p.get("reveil"):     # réveil d'un coordinateur endormi : sa session vient d'être fermée
+        _attendre_fin_du_processus(projet, p["equipe"])
     args = argparse.Namespace(
         role=p["role"], equipe=p.get("equipe"), tache=p.get("tache"), modele=p.get("modele"),
         essai_a_blanc=False, reprendre=bool(p.get("reprendre")), session=p.get("session"),
@@ -165,7 +183,9 @@ def _executer_lancer(projet, ordre_id, p):
     try:
         if p.get("role") == "worker" and p.get("equipe") != lancer.EQUIPE_INTEGRATION:
             _consigne_de_tache(conn, projet, p)
-        if p.get("role") == "coord":
+        if p.get("reveil"):     # le message qui l'a réveillé suffit : pas de consigne d'ouverture
+            repos.noter_reveil(projet, conn, p["cible"], p.get("session"), ordre_id)
+        elif p.get("role") == "coord":
             _consigne_d_ouverture(conn, p)
         if code == CODE_APPROBATION:
             _signalement_d_approbation(conn, p, session)
@@ -296,14 +316,61 @@ def compter_workers(sessions) -> int:
     return sum("-worker-" in nom for nom in sessions)
 
 
-def _sessions_vivantes() -> set[str]:
+def _sessions_vivantes() -> set[str] | None:
+    """Les sessions tmux de la machine ; None quand tmux est muet (le bac à sable d'un agent)."""
     from cime.signaux import livraison
-    return livraison.sessions_vivantes()
+    return livraison.sonde_sessions()
+
+
+def chemin_charge(projet) -> Path:
+    """Le compte de workers actifs que le facteur inscrit pour les agents."""
+    return Path(projet) / ".orga" / "etat" / "charge.json"
+
+
+def _compte_inscrit(projet) -> int | None:
+    try:
+        compte = json.loads(chemin_charge(projet).read_text(encoding="utf-8"))["workers_actifs"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return compte if isinstance(compte, int) and not isinstance(compte, bool) and compte >= 0 \
+        else None
+
+
+def inscrire_charge(projet) -> bool:
+    """Le facteur, qui voit tmux, inscrit le nombre de workers actifs ; seulement quand il change.
+    Écriture atomique (fichier voisin puis remplacement). Renvoie True s'il a écrit. Tmux muet :
+    rien n'est inscrit."""
+    sessions = _sessions_vivantes()
+    if sessions is None:
+        return False
+    actifs = compter_workers(sessions)
+    if _compte_inscrit(projet) == actifs:
+        return False
+    chemin = chemin_charge(projet)
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    temporaire = chemin.with_name(chemin.name + ".tmp")
+    temporaire.write_text(json.dumps({"workers_actifs": actifs}), encoding="utf-8")
+    os.replace(temporaire, chemin)
+    return True
+
+
+def charge_machine(projet) -> tuple[int | None, int, str | None]:
+    """(workers actifs, plafond `[charge] workers_max`, source du compte). Source : `"tmux"` quand
+    l'appelant voit tmux ; `"facteur"` quand le compte vient du fichier du facteur, qui bat ;
+    None quand on ne sait pas (facteur arrêté, fichier absent ou illisible) — un compte inscrit
+    par un facteur arrêté est périmé et ne sert pas."""
+    plafond = lire_manifeste(projet).workers_max
+    sessions = _sessions_vivantes()
+    if sessions is not None:
+        return compter_workers(sessions), plafond, "tmux"
+    from cime.lanceur.surveillant import battement_frais
+    actifs = _compte_inscrit(projet) if battement_frais(Path(projet)) else None
+    return actifs, plafond, ("facteur" if actifs is not None else None)
 
 
 def plafond_atteint(projet) -> tuple[bool, int, int]:
-    """(atteint, workers actifs sur la machine, plafond `[charge] workers_max`)."""
-    actifs = compter_workers(_sessions_vivantes())
+    """(atteint, workers actifs sur la machine, plafond), d'après tmux : pour l'appelant qui le voit."""
+    actifs = compter_workers(_sessions_vivantes() or set())
     plafond = lire_manifeste(projet).workers_max
     return actifs >= plafond, actifs, plafond
 
@@ -324,12 +391,16 @@ def _lancement_de_worker_en_file(projet, identifiant) -> bool:
 
 
 def _retenu_par_le_plafond(projet, identifiant) -> bool:
-    return _lancement_de_worker_en_file(projet, identifiant) and plafond_atteint(projet)[0]
+    """Décision du facteur, qui voit tmux : un lancement de worker attend si le plafond est atteint
+    ou si tmux ne répond pas (un tmux muet n'est pas « zéro worker »)."""
+    if not _lancement_de_worker_en_file(projet, identifiant):
+        return False
+    sessions = _sessions_vivantes()
+    return sessions is None or compter_workers(sessions) >= lire_manifeste(projet).workers_max
 
 
-def lancements_retenus(projet) -> list[str]:
-    """Cibles des lancements de worker qui attendent une place, dans l'ordre de la file ; vide
-    tant que le plafond n'est pas atteint."""
+def cibles_en_file(projet) -> list[str]:
+    """Cibles des lancements de worker en file, dans l'ordre de la file."""
     conn = ouvrir(projet)
     try:
         en_file = conn.execute(
@@ -337,9 +408,18 @@ def lancements_retenus(projet) -> list[str]:
         ).fetchall()
     finally:
         conn.close()
-    cibles = [cible for identifiant, cible in en_file
-              if _lancement_de_worker_en_file(projet, identifiant)]
-    return cibles if cibles and plafond_atteint(projet)[0] else []
+    return [cible for identifiant, cible in en_file
+            if _lancement_de_worker_en_file(projet, identifiant)]
+
+
+def lancements_retenus(projet) -> tuple[list[str], int | None, int]:
+    """(cibles des lancements de worker qui attendent une place, workers actifs, plafond). Les
+    cibles sont vides tant que le plafond n'est pas atteint ; avec un compte inconnu (actifs
+    None), tout lancement en file est dit en attente."""
+    cibles = cibles_en_file(projet)
+    actifs, plafond, _ = charge_machine(projet)
+    retenu = actifs is None or actifs >= plafond
+    return (cibles if retenu else []), actifs, plafond
 
 
 def _executer_en_file(projet, identifiant) -> bool:

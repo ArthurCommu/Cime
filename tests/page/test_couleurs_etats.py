@@ -266,7 +266,7 @@ def _etat_attendu(agent, etat):
     if agent["etat"] == "arrete" and agent["vivant"] is None:
         return "inconnu", "gris"
     if agent["etat"] != "arrete":
-        return {"travaille": ("travaille", "vert"), "au_repos": ("au repos", "gris"), "attend_autorisation": ("attend une autorisation", "ambre"),
+        return {"travaille": ("travaille", "vert"), "au_repos": ("au repos", "gris"), "endormi": ("endormi", "gris"), "attend_autorisation": ("attend une autorisation", "ambre"),
                 "attend_reponse": ("attend une réponse", "ambre"), "inconnu": ("inconnu", "gris")}[agent["etat"]]
     citent = [a for a in etat["alarmes"] if agent["id"] in a.get("agents", [])]
     terminee = any(q["nom"] == agent["equipe"] and q["statut"] == "terminee" for q in etat["equipes"])
@@ -277,7 +277,7 @@ def _etat_attendu(agent, etat):
 
 def _effectifs_attendus(etat):
     terminees = {q["nom"] for q in etat["equipes"] if q["statut"] == "terminee"}
-    n = {"travaille": 0, "au_repos": 0, "attend": 0, "a_l_arret": 0, "inconnu": 0, "arrete": 0}
+    n = {"travaille": 0, "au_repos": 0, "endormi": 0, "attend": 0, "a_l_arret": 0, "inconnu": 0, "arrete": 0}
     for a in etat["agents"]:
         if a["role"] == "utilisateur" or a["equipe"] in terminees:
             continue
@@ -285,11 +285,13 @@ def _effectifs_attendus(etat):
         if mot == "clos":
             continue
         n["arrete" if mot == "arrêté" else "a_l_arret" if mot == "à l’arrêt" else "travaille" if mot == "travaille" else "au_repos" if mot == "au repos"
-          else "inconnu" if mot == "inconnu" else "attend"] += 1
+          else "endormi" if mot == "endormi" else "inconnu" if mot == "inconnu" else "attend"] += 1
     mot = lambda k, un, pl: f"{k}{NB}{un if k == 1 else pl}"  # noqa: E731
     morceaux = [mot(n["travaille"], "travaille", "travaillent")]
     if n["au_repos"]:
         morceaux.append(mot(n["au_repos"], "au repos", "au repos"))
+    if n["endormi"]:
+        morceaux.append(mot(n["endormi"], "endormi", "endormis"))
     if n["attend"]:
         morceaux.append(mot(n["attend"], "attend", "attendent"))
     if n["a_l_arret"]:

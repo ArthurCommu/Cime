@@ -199,6 +199,26 @@ def _agents(conn, journal: bool = False) -> dict:
     return resultat
 
 
+def _endormis(conn, tables: set) -> dict:
+    """Agent → horodatage de son `CoordEndormi`, pour chaque coordinateur qui dort : son dernier
+    sommeil ou réveil est un sommeil, et aucune session de l'agent n'a démarré depuis."""
+    if "evenements" not in tables:
+        return {}
+    return {
+        r["agent"]: r["horodatage"]
+        for r in conn.execute(
+            """SELECT d.agent, d.horodatage FROM (
+                 SELECT json_extract(details, '$.agent') AS agent, id, horodatage, evenement,
+                        ROW_NUMBER() OVER (PARTITION BY json_extract(details, '$.agent')
+                                           ORDER BY id DESC) AS rn
+                 FROM evenements WHERE evenement IN ('CoordEndormi', 'CoordReveille')
+               ) d
+               WHERE d.rn = 1 AND d.evenement = 'CoordEndormi' AND d.agent IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM evenements s WHERE s.agent = d.agent
+                                 AND s.evenement = 'SessionStart' AND s.id > d.id)""")
+    }
+
+
 def _fil(conn, tables: set) -> list:
     lignes = []
     avec_transitions = "transitions" in tables
@@ -426,6 +446,7 @@ def _lire(conn, maintenant: datetime) -> dict:
             "fil": _fil(conn, tables),
             "questions_en_attente": _questions(conn, tables),
             "agents": _agents(conn, "journal" in tables),
+            "endormis": _endormis(conn, tables),
             "attentes_utilisateur": _attentes_utilisateur(conn, "journal" in tables, tables),
             **vue_2_0,
             "signaux": _signaux(conn, tables, vue_2_0["files"], vue_2_0["ordres"], vue_2_0["facteur"]),

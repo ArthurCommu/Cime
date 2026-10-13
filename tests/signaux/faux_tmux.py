@@ -16,12 +16,21 @@ class FauxTmux:
         self.apres_capture = []          # fonctions(self, n) appelées après chaque capture
         self.apres_frappe = []           # fonctions(self, session, texte) après un `-l`
         self.echec_send_keys = False
+        self.kills = []                  # sessions fermées par `kill-session`
+        self.avant_kill = []             # fonctions(session) appelées juste avant une fermeture
 
     def __call__(self, *args):
         self.appels.append(args)
         commande = args[0]
         if commande == "list-sessions":
             return self._ok("\n".join(self.sessions) + "\n")
+        if commande == "kill-session":
+            nom = args[args.index("-t") + 1].lstrip("=")
+            for f in list(self.avant_kill):
+                f(nom)
+            self.kills.append(nom)
+            self.sessions.pop(nom, None)
+            return self._ok("")
         session = self._session(args)
         if commande == "display-message":
             if "#{pane_width} #{pane_height}" in args:      # largeur et hauteur du pane : 78 colonnes, 45 lignes

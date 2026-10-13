@@ -11,7 +11,7 @@ from datetime import datetime
 
 from cime.fondation.projet import ErreurProjet
 from cime.fondation.registre import ouvrir
-from cime.signaux import autorisations, commandes, echeances, livraison
+from cime.signaux import autorisations, commandes, echeances, livraison, repos
 from cime.signaux.echeances import Etape
 
 UTILISATEUR = "utilisateur"
@@ -213,7 +213,8 @@ def autorisations_a_utilisateur(conn, projet, maintenant: datetime) -> int:
 def dette_au_repos(conn, projet, maintenant: datetime) -> int:
     """Un agent au repos depuis plus de `DETTE_AU_REPOS` avec une obligation ouverte à son nom :
     relance au débiteur, puis signalement → sup, → sup du sup. L'échelle repart à chaque repos
-    (la clé porte l'id de l'événement de fin de tour). Sans dette, jamais rien. Jamais de
+    (la clé porte l'id de l'événement de fin de tour). Rien ne court pour un coordinateur endormi, et
+    le repos d'avant son sommeil ne compte pas après son réveil. Sans dette, jamais rien. Jamais de
     relance de dette à l'Assistant (ni à l'utilisateur) : leurs seules échéances sont les lignes explicites
     de `echeances.ECHELLES`."""
     inscrits = 0
@@ -221,11 +222,15 @@ def dette_au_repos(conn, projet, maintenant: datetime) -> int:
         "SELECT DISTINCT debiteur FROM obligations WHERE etat = 'ouverte' AND attendu != 'accuse'"
         " AND debiteur NOT IN ('utilisateur', 'assistant')")]
     for agent in agents:
-        repos = livraison.repos_depuis(conn, agent, maintenant)
-        if repos is None:
+        fin_de_tour = livraison.repos_depuis(conn, agent, maintenant)
+        if fin_de_tour is None:
             continue
-        evenement_id, depuis = repos
-        ecoule = (maintenant - echeances.depart(conn, depuis)).total_seconds()
+        evenement_id, depuis = fin_de_tour
+        if repos.episode(conn, agent):
+            continue                    # il dort : aucune échéance ne court tant que sa session est fermée
+        depart = echeances.depart(conn, depuis)
+        sommeil = repos.sommeil_ou_reveil_a(conn, agent)
+        ecoule = (maintenant - (max(depart, sommeil) if sommeil else depart)).total_seconds()
         cumul = 0.0
         for rang, etape in enumerate(echeances.ECHELLE_DETTE_AU_REPOS):
             cumul += etape.delai.total_seconds()

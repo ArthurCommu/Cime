@@ -18,6 +18,7 @@ def _sans_agent_ni_projet_reels(monkeypatch, tmp_path_factory):
 def _jamais_le_vrai_tmux(monkeypatch):
     """Aucun test de signaux ne lance le vrai `tmux` : tout appel du facteur échoue le test,
     sauf si le test pose son faux tmux (`monkeypatch.setattr(livraison, "_tmux", faux)`)."""
+    from cime.fondation import fermeture
     from cime.signaux import livraison, ordres
 
     def interdit(*args):
@@ -25,6 +26,7 @@ def _jamais_le_vrai_tmux(monkeypatch):
 
     monkeypatch.setattr(livraison, "_tmux", interdit)
     monkeypatch.setattr(ordres, "_tmux", interdit)
+    monkeypatch.setattr(fermeture, "_tmux", interdit)
 
 
 @pytest.fixture(autouse=True)

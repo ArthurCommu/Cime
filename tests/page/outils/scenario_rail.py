@@ -139,7 +139,10 @@ def parcourir(nav, nom, url, sorties, erreurs):
     trouvees = balayer(pg)
     pg.locator("#plateau .commande-legende").click()
     verifier(f"{nom} : « Légende » ouvre la légende", pg.locator("#legende-plateau").is_visible())
-    pg.mouse.click(*next(iter(trouvees.values())))
+    # le premier point trouvé peut tomber sous la légende ouverte : on clique hors d'elle, pour que le clic atteigne la scène
+    lg = pg.locator("#legende-plateau").bounding_box()
+    hors = next(p for p in trouvees.values() if not (lg["x"] <= p[0] <= lg["x"] + lg["width"] and lg["y"] <= p[1] <= lg["y"] + lg["height"]))
+    pg.mouse.click(*hors)
     pg.wait_for_timeout(150)
     verifier(f"{nom} : un clic dans la scène referme la légende", not pg.locator("#legende-plateau").is_visible())
     pg.locator("#plateau .commande-legende").click()

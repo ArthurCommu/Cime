@@ -105,6 +105,33 @@ def _rang(identite: str) -> tuple:
     return (0 if identite == "assistant" else 1 if identite.startswith("coord-") else 2, identite)
 
 
+def identites_vivantes(prefixe: str, sessions) -> dict:
+    """Identité → nom de session, pour les sessions tmux `<préfixe>-<identité>`."""
+    marque = f"{prefixe}-"
+    return {session[len(marque):]: session for session in sessions if session.startswith(marque)}
+
+
+def raisons_de_garder(*, vivants, equipes_connues, coordinables, taches, debiteurs,
+                      en_attente) -> dict:
+    """Coordinateur → pourquoi on le garde, pour chaque équipe de `coordinables` qui en a une :
+    `travail` (un worker de l'équipe vit, une tâche de l'équipe est en cours, ou le coordinateur est
+    débiteur d'une obligation ouverte) ou `message` (un message `inscrit` ou `livre` lui est adressé).
+    Un coordinateur absent du résultat n'a aucune dette. `vivants` : identités des sessions vivantes.
+    C'est la seule définition de « sans dette » : `calculer_plan` (qui relancer) et la mise au repos
+    des coordinateurs (qui fermer) l'appellent toutes deux."""
+    equipes_avec_worker = {_equipe_du_worker(i, equipes_connues) for i in vivants
+                           if i.startswith("worker-")}
+    equipes_avec_tache = {t.split("/", 1)[0] for t in taches}
+    raisons = {}
+    for equipe in sorted(coordinables):
+        coord = f"coord-{equipe}"
+        if equipe in equipes_avec_worker or equipe in equipes_avec_tache or coord in debiteurs:
+            raisons[coord] = "travail"
+        elif coord in en_attente:
+            raisons[coord] = "message"
+    return raisons
+
+
 def calculer_plan(*, prefixe: str, sessions, session_de: dict, equipes_connues, coordinables,
                   taches, debiteurs, en_attente) -> dict:
     """Ce que le repère retient. `sessions` : noms de sessions tmux vivantes ; `session_de` : agent →
@@ -112,11 +139,7 @@ def calculer_plan(*, prefixe: str, sessions, session_de: dict, equipes_connues, 
     celles qui ont un coordinateur à relancer ; `taches` : `équipe/tâche` en cours ; `debiteurs` :
     agents qui ont une obligation ouverte ; `en_attente` : agents qui ont un message `inscrit` ou
     `livre`."""
-    marque = f"{prefixe}-"
-    vivants = {}                       # identité -> nom de session
-    for session in sessions:
-        if session.startswith(marque):
-            vivants[session[len(marque):]] = session
+    vivants = identites_vivantes(prefixe, sessions)
     conversations = []
     for identite in sorted(vivants, key=_rang):
         session_id = session_de.get(identite)
@@ -130,20 +153,10 @@ def calculer_plan(*, prefixe: str, sessions, session_de: dict, equipes_connues, 
             if equipe:
                 entree["equipe"] = equipe
         conversations.append(entree)
-    equipes_avec_worker = {_equipe_du_worker(i, equipes_connues) for i in vivants
-                           if i.startswith("worker-")}
-    equipes_avec_tache = {t.split("/", 1)[0] for t in taches}
-    a_relancer, raisons = ["assistant"], {"assistant": "assistant"}
-    for equipe in sorted(coordinables):
-        coord = f"coord-{equipe}"
-        if equipe in equipes_avec_worker or equipe in equipes_avec_tache or coord in debiteurs:
-            raison = "travail"
-        elif coord in en_attente:
-            raison = "message"
-        else:
-            continue
-        a_relancer.append(coord)
-        raisons[coord] = raison
+    gardes = raisons_de_garder(vivants=vivants, equipes_connues=equipes_connues,
+                               coordinables=coordinables, taches=taches, debiteurs=debiteurs,
+                               en_attente=en_attente)
+    a_relancer, raisons = ["assistant", *gardes], {"assistant": "assistant", **gardes}
     return {"conversations": conversations, "a_relancer": a_relancer, "raisons": raisons,
             "taches_en_cours": sorted(taches)}
 
@@ -192,16 +205,19 @@ def _debiteurs(conn) -> set:
                                         " WHERE etat = 'ouverte'")}
 
 
-def occupes(projet, conn) -> list[str]:
+def occupes(projet, conn, donnees=None) -> list[str]:
     """Agents occupés : état d'observation `travaille` ou demande d'autorisation ouverte (règle de
     `observation/registre.py`), ou courrier dont la livraison est en cours (bail pris).
 
     Un état d'observation que seul un `SessionStart` (`startup`/`resume`) plus récent contredit
     n'est pas un travail en cours : la session a été tuée en plein tour et reprise (comme
-    `livraison.etat_agent`)."""
+    `livraison.etat_agent`).
+
+    `donnees` : la lecture du registre d'observation, si l'appelant l'a déjà faite."""
     from cime.observation.registre import lire_registre
     noms = set()
-    donnees, _ = lire_registre(Path(projet), datetime.now(timezone.utc))
+    if donnees is None:
+        donnees, _ = lire_registre(Path(projet), datetime.now(timezone.utc))
     for agent, etat in ((donnees or {}).get("agents") or {}).items():
         if etat.get("etat") not in ("travaille", "attend_autorisation") or agent == AUTEUR:
             continue

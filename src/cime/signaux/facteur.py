@@ -1,7 +1,7 @@
 """Le facteur : processus séparé, `cime facteur`.
 
 Un tour fait, dans cet ordre : (1) les ordres `en_file`, par id ; (2) la livraison tmux ;
-(3) les échéances. Le facteur est le seul qui lit et écrit les terminaux. Une exception dans
+(3) les échéances ; (4) la mise au repos des coordinateurs sans rien à faire. Le facteur est le seul qui lit et écrit les terminaux. Une exception dans
 une étape est journalisée (`.orga/etat/facteur-erreurs.log`) et n'arrête pas la boucle.
 """
 import contextlib
@@ -16,7 +16,8 @@ from pathlib import Path
 
 from cime.fondation import fermeture
 from cime.fondation.registre import horodatage, ouvrir
-from cime.signaux import commandes, echeances, livraison, ordres, relances, signalements_utilisateur
+from cime.signaux import (
+    commandes, echeances, livraison, ordres, relances, repos, signalements_utilisateur)
 from cime.signaux.livraison import Memoire
 
 PAS_FACTEUR = echeances.PAS_FACTEUR
@@ -102,6 +103,10 @@ def _etape_ordres(projet, maintenant, memoire) -> int:
     return executes
 
 
+def _etape_charge(projet, maintenant, memoire) -> None:
+    ordres.inscrire_charge(projet)     # le compte que les agents, sans tmux, liront
+
+
 def _etape_livraison(projet, maintenant, memoire) -> None:
     if not memoire.demarre:
         conn = ouvrir(projet)
@@ -125,8 +130,12 @@ def _etape_echeances(projet, maintenant, memoire) -> None:
         conn.close()
 
 
-ETAPES = (("ordres", _etape_ordres), ("livraison", _etape_livraison),
-          ("echeances", _etape_echeances))
+def _etape_repos(projet, maintenant, memoire) -> None:
+    repos.endormir(projet, maintenant)
+
+
+ETAPES = (("ordres", _etape_ordres), ("charge", _etape_charge), ("livraison", _etape_livraison),
+          ("echeances", _etape_echeances), ("repos", _etape_repos))
 
 
 def tour(projet, maintenant=None, memoire=None) -> dict:

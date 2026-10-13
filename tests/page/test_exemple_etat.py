@@ -16,7 +16,7 @@ import pytest
 EXEMPLES = Path(__file__).resolve().parent / "fixtures"
 
 ROLES = {"utilisateur", "assistant", "coordinateur", "worker"}
-ETATS = {"travaille", "au_repos", "attend_autorisation", "attend_reponse", "arrete", "inconnu"}
+ETATS = {"travaille", "au_repos", "endormi", "attend_autorisation", "attend_reponse", "arrete", "inconnu"}
 STATUTS = {"active", "au_repos", "bloquee", "terminee"}
 NATURES_ATTENTE = {"autorisation", "decision", "donnee", "cloture", "rapport"}
 TYPES_ALARME = {
@@ -175,8 +175,8 @@ def verifier_agents_forme(e):
         # état cohérent avec la session
         if a["etat"] == "arrete":
             assert a["vivant"] is False, a["id"]
-        if a["vivant"] is False:
-            assert a["etat"] == "arrete", a["id"]
+        if a["vivant"] is False:  # un coordinateur endormi a sa session fermée, comme un arrêté
+            assert a["etat"] in ("arrete", "endormi"), a["id"]
         if a["etat"] != "inconnu" and a["role"] != "utilisateur":
             assert a["etat_source"] and a["etat_depuis"], a["id"]
 
@@ -258,7 +258,7 @@ def _statut_attendu(e, equipe):  # évaluée dans l'ordre
         return "bloquee"
     if any(a["etat"] == "travaille" or (a["role"] == "worker" and a["vivant"] is True) for a in agents):
         return "active"
-    if agents and all(a["etat"] in ("au_repos", "arrete") for a in agents):
+    if agents and all(a["etat"] in ("au_repos", "endormi", "arrete") for a in agents):
         return "au_repos"
     return None
 

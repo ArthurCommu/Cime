@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from cime.fondation.registre import ouvrir
-from cime.signaux import commandes, obligations, ordres
+from cime.signaux import commandes, obligations, ordres, repos
 from cime.signaux.commandes import facteur_arrete, secondes_depuis
 
 PLAFOND = 4000
@@ -37,12 +37,13 @@ def _court(texte: str, n: int = 90) -> str:
     return texte if len(texte) <= n else texte[:n - 1] + "…"
 
 
-def _equipes(projet: Path) -> list[str]:
+def _equipes(projet: Path, endormis=()) -> list[str]:
     dossier = projet / ".orga" / "teams"
     lignes = []
     for equipe in sorted(d for d in dossier.iterdir() if d.is_dir()) if dossier.is_dir() else []:
         en_cours = sorted(f.stem for f in (equipe / "tasks" / "in-progress").glob("*.md"))
         note = " (clôturée)" if (equipe / "CLOTUREE").exists() else ""
+        note += " (coordinateur endormi)" if f"coord-{equipe.name}" in endormis else ""
         lignes.append(f"{equipe.name}{note} : " + (", ".join(en_cours) if en_cours else "rien en cours"))
     return lignes
 
@@ -70,6 +71,7 @@ def texte_reprise(projet: Path, moi: str, complet: bool = False) -> str:
             " WHERE m.a = ? AND NOT EXISTS (SELECT 1 FROM transitions t"
             " WHERE t.message_id = m.id AND t.etat = 'clos') ORDER BY m.id", (moi,)).fetchall()
         utilisateur = obligations.ouvertes_de(conn, "utilisateur") if moi == "assistant" else []
+        endormis = repos.endormis(conn)
     finally:
         conn.close()
     blocs = []
@@ -89,7 +91,7 @@ def texte_reprise(projet: Path, moi: str, complet: bool = False) -> str:
         f"(c) Courrier à mon adresse non clos ({len(courrier)})",
         [f"#{i} de {de} ({nature}, {age(h)}) : {_court(resume)}"
          for i, de, nature, resume, h in courrier], complet))
-    blocs.append(_section("(d) Équipes et tâches en cours", _equipes(projet), complet,
+    blocs.append(_section("(d) Équipes et tâches en cours", _equipes(projet, endormis), complet,
                           vide="aucune équipe"))
     if moi == "assistant":
         blocs.append(_section(
@@ -98,9 +100,9 @@ def texte_reprise(projet: Path, moi: str, complet: bool = False) -> str:
              f"{_court(o['resume'])}" for o in utilisateur], complet))
     blocs.append(_section("(f) Dernières décisions (CHANGELOG des contrats)",
                           _decisions(projet), complet))
-    retenus = ordres.lancements_retenus(projet)
+    retenus, actifs, plafond = ordres.lancements_retenus(projet)
     if retenus:
-        _, actifs, plafond = ordres.plafond_atteint(projet)
+        actifs = "?" if actifs is None else actifs
         noms = retenus if complet else retenus[:MAX_LIGNES]
         reste = len(retenus) - len(noms)
         suite = f", … et {reste} de plus" if reste else ""

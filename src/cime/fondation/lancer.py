@@ -1,27 +1,25 @@
-"""`cime lancer` : prépare les réglages d'un agent et démarre sa session tmux.
+"""`cime lancer` : prépare les réglages d'un agent (construits par `reglages.py`) et démarre
+sa session tmux.
 
 Un worker dont la fiche est restée dans `in-progress/` sans session tmux ni processus `claude`
 est orphelin : le lancer reprend la même fiche dans une nouvelle session, sans rien déplacer."""
 
 import argparse
-import copy
-import json
 import os
 import re
 import shlex
-import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from cime.fondation.nom import NOM, VAR_AGENT, VAR_PROJET
-from cime.fondation.perimetre import zones_ecriture_projet
+from cime.fondation import reglages
+from cime.fondation.nom import VAR_AGENT, VAR_PROJET
 from cime.fondation.projet import (
     ErreurProjet, Manifeste, lire_manifeste, session_tmux, trouver_projet,
     worktree_equipe,
 )
-from cime.fondation.reglages import INTERDITS_INTEGRATION, bac_a_sable, regles_commit_equipe
+from cime.fondation.reglages import Refus
 
 _NOM_VALIDE = re.compile(r"[a-z0-9-]+")
 _NOM_SESSION = re.compile(r"[A-Za-z0-9-]+")
@@ -41,10 +39,6 @@ MESSAGE_ASSISTANT = "Lis .orga/teams/assistant/CLAUDE.md et commence ta mission.
 MESSAGE_COORDINATEUR = "Lis CLAUDE.md puis mandate.md et commence ta mission."
 
 
-class Refus(ErreurProjet):
-    """Reprise refusée avant tout lancement (code 2)."""
-
-
 def _nom(valeur: str | None, libelle: str) -> str:
     if not valeur:
         raise ErreurProjet(f"{libelle} requis pour ce rôle")
@@ -53,225 +47,12 @@ def _nom(valeur: str | None, libelle: str) -> str:
     return valeur
 
 
-_FICHIER_ROLE = {"assistant": "settings.json", "worker": "settings-agent.json",
-                 "coord": "settings-coordinateur.json"}
-
-
-def reglages(projet: Path, role: str) -> Path:
-    """Fichier statique du rôle (`.claude/settings*.json`), écrit par `init`."""
-    nom = _FICHIER_ROLE[role]
-    fichier = (Path(projet) / ".claude" / nom).resolve()
-    if not fichier.is_file():
-        raise ErreurProjet(
-            f"réglages absents : {fichier} — relance `{NOM} init` dans ce projet "
-            "(il écrit les fichiers de réglages manquants, sans toucher aux autres)")
-    return fichier
-
-
-def dossier_etat(projet: Path) -> Path:
-    return Path(projet) / ".orga" / "etat"
-
-
-def dossier_tmp(projet: Path) -> Path:
-    """Dossier temporaire de Claude Code (CLAUDE_CODE_TMPDIR) : privé, il veut 0o700."""
-    return dossier_etat(projet) / "tmp"
-
-
-def dossier_memoire(projet: Path) -> Path:
-    return dossier_etat(projet) / "memoire"
-
-
-def dossier_essais(projet: Path) -> Path:
-    """Essais et intégration : jamais hors du projet (voir le socle, `integration.md`)."""
-    return dossier_etat(projet) / "essais"
-
-
-def preparer_tmp(projet: Path) -> None:
-    dossier = dossier_tmp(projet)
-    dossier.mkdir(parents=True, exist_ok=True)
-    os.chmod(dossier, 0o700)
-
-
-def fichier_reglages_generes(projet: Path, identite: str) -> Path:
-    return dossier_etat(projet) / "reglages" / f"{identite}.json"
-
-
 def _identite(role: str, equipe: str | None, tache: str | None) -> str:
     if role == "assistant":
         return "assistant"
     if role == "coord":
         return f"coord-{equipe}"
     return f"worker-{equipe}-{tache}"
-
-
-def racine_de_l_outil(cible: Path) -> Path:
-    """Dossier à rouvrir en lecture pour que `cible` (exécutable déjà résolu) tourne : le
-    premier parent qui contient un `pyvenv.cfg` (racine de son environnement), sinon le
-    dossier qui le contient. Rien de codé en dur."""
-    cible = Path(cible)
-    for parent in cible.parents:
-        if (parent / "pyvenv.cfg").is_file():
-            return parent
-    return cible.parent
-
-
-def dossier_outil() -> Path | None:
-    """Dossier de l'outil `cime` à rouvrir en lecture dans le bac à sable (`None` si rien à
-    ouvrir). Un environnement dont la racine serait la maison, ou la contiendrait, n'est
-    jamais rouvert : ce serait rouvrir toute la maison, `~/.ssh` compris."""
-    trouve = shutil.which(NOM)
-    if trouve is None:
-        trouve = sys.argv[0] if os.sep in sys.argv[0] else sys.executable
-    racine = racine_de_l_outil(Path(os.path.realpath(trouve)))
-    maison = Path.home().resolve()
-    if racine == maison or racine in maison.parents:
-        return None
-    return racine
-
-
-def _paquet_cime() -> str:
-    """Dossier du paquet `cime` (`cime` est un paquet-espace de noms : pas de `__file__`)."""
-    import cime
-    return next(iter(cime.__path__))
-
-
-def dossier_source_cime() -> Path | None:
-    """Entrée de `sys.path` d'où `cime` est effectivement importé (`<…>/src` en éditable,
-    `…/site-packages` sinon), `realpath`, jamais écrite en dur. `None` si c'est la maison ou un
-    parent de la maison : on ne rouvre jamais toute la maison."""
-    source = Path(os.path.realpath(_paquet_cime())).parent
-    maison = Path.home().resolve()
-    if source == maison or source in maison.parents:
-        return None
-    return source
-
-
-def _lisible(chemin: Path, allow: list[str], deny: list[str]) -> bool:
-    """Le bac à sable laisse-t-il lire `chemin` ? Une entrée de `allowRead` l'emporte sur
-    `denyRead` ; hors de l'un et de l'autre, la lecture est libre."""
-    chemin = Path(chemin)
-    if any(chemin.is_relative_to(a) for a in allow):
-        return True
-    return not any(chemin.is_relative_to(d) for d in deny)
-
-
-def import_cime_non_lisible(sandbox: dict, paquet_cime: Path, chemins: list[str]) -> list[Path]:
-    """Fonction pure : les dossiers que `cime` doit lire pour s'importer sans que les lectures
-    du bac à sable `sandbox` (bloc `sandbox` généré) les couvrent. `paquet_cime` est le
-    dossier du paquet `cime` (`cime.__path__`) ; `chemins`, le `sys.path` de l'interpréteur de l'outil (les entrées
-    inexistantes sont ignorées). Liste vide : l'import passe."""
-    lectures = sandbox.get("filesystem", {})
-    allow = [str(a) for a in lectures.get("allowRead", [])]
-    deny = [str(d) for d in lectures.get("denyRead", [])]
-    manquants = []
-    for chemin in [Path(paquet_cime).parent, *(Path(c) for c in chemins if c)]:
-        if chemin.exists() and not _lisible(chemin, allow, deny) and chemin not in manquants:
-            manquants.append(chemin)
-    return manquants
-
-
-def sonder_import_cime(python: str) -> tuple[Path, list[str]]:
-    """(dossier du paquet `cime`, `sys.path`) vus par `python -I` : l'interpréteur de l'outil. `Refus` si
-    `cime` ne s'y importe pas du tout."""
-    try:
-        r = subprocess.run(
-            [python, "-I", "-c",
-             "import json, sys, cime; print(json.dumps([list(cime.__path__)[0], sys.path]))"],
-            capture_output=True, text=True, timeout=30)
-        fichier, chemins = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 else (None, None)
-    except (OSError, subprocess.SubprocessError, ValueError, IndexError) as e:
-        raise Refus(f"autotest : `{python} -c 'import cime'` n'a pas pu s'exécuter ({e}) ; "
-                    "vérifie l'installation `uv tool`") from e
-    if fichier is None:
-        raise Refus(f"autotest : cime ne s'importe pas avec {python} : "
-                    f"{r.stderr.strip().splitlines()[-1] if r.stderr.strip() else r.returncode} ; "
-                    "vérifie l'installation `uv tool`")
-    return Path(os.path.realpath(fichier)), chemins
-
-
-def verifier_import_cime(sandbox: dict, paquet_cime: Path, chemins: list[str]) -> None:
-    """Refuse (`Refus`, code 2) si `cime` ne peut pas s'importer sous les lectures `sandbox`.
-    Le message dit quoi faire."""
-    manquants = import_cime_non_lisible(sandbox, paquet_cime, chemins)
-    if manquants:
-        liste = ", ".join(f"`{m}`" for m in manquants)
-        raise Refus(f"la source de cime {liste} n'est pas couverte par les lectures de "
-                    "l'agent (allowRead) : `cime reprise` y échouerait avec ModuleNotFoundError "
-                    "et l'agent serait muet ; vérifie l'installation `uv tool`")
-
-
-def python_de_l_outil() -> str:
-    """Interpréteur de l'environnement de `cime` : `<racine>/bin/python`, à défaut celui-ci."""
-    racine = dossier_outil()
-    candidat = racine / "bin" / "python" if racine is not None else None
-    return str(candidat) if candidat is not None and candidat.exists() else sys.executable
-
-
-def construire_reglages(statique: dict, projet: Path, identite: str, sites: list[str],
-                        home: Path, uid: int, zones_ecriture: list[Path],
-                        outil: Path | None = None, regles_allow: list[str] | None = None,
-                        regles_deny: tuple[str, ...] = (), source: Path | None = None) -> dict:
-    """Contenu du fichier généré au lancement (fonction pure). Les clés du fichier statique
-    passent telles quelles, sauf `sandbox` et `autoMemoryDirectory`, qui sont remplacés.
-    L'Assistant ne tourne pas dans le bac à sable : pas de `sandbox`."""
-    memoire = str(dossier_memoire(projet) / identite)
-    if identite == "assistant":
-        return {k: v for k, v in statique.items() if k != "sandbox"} | {
-            "autoMemoryDirectory": memoire}
-    contenu = {**statique,
-               **bac_a_sable(projet, sites, home, uid, zones_ecriture, outil, source),
-               "autoMemoryDirectory": memoire}
-    if regles_allow:  # ex. le droit de commit d'un coordinateur dans le worktree de son équipe
-        permissions = copy.deepcopy(contenu.get("permissions") or {})
-        permissions["allow"] = [*permissions.get("allow", []),
-                                *(r for r in regles_allow if r not in permissions.get("allow", []))]
-        contenu["permissions"] = permissions
-    if regles_deny:  # ex. la session d'intégration ne commite ni ne fusionne jamais
-        permissions = copy.deepcopy(contenu.get("permissions") or {})
-        permissions["deny"] = [*permissions.get("deny", []),
-                               *(r for r in regles_deny if r not in permissions.get("deny", []))]
-        contenu["permissions"] = permissions
-    return contenu
-
-
-def zones_du_bac_a_sable(projet: Path, identite: str, integration: bool = False) -> list[Path]:
-    """Où l'agent peut écrire : celles de sa garde ; le projet entier si la garde ne le
-    limite pas ; et `.orga/etat/essais` pour une session d'intégration."""
-    zones = zones_ecriture_projet(projet, identite)
-    zones = [projet] if zones is None else zones
-    return [*zones, dossier_essais(projet)] if integration else zones
-
-
-def contenu_reglages_generes(projet: Path, identite: str, role: str, manifeste: Manifeste,
-                             integration: bool = False) -> dict:
-    """Ce que `ecrire_reglages_generes` écrit, sans rien écrire."""
-    projet = Path(projet).resolve()
-    statique = json.loads(reglages(projet, role).read_text(encoding="utf-8"))
-    regles = []
-    if role == "coord" and identite.startswith("coord-"):
-        regles = regles_commit_equipe(worktree_equipe(projet, manifeste, identite[len("coord-"):]))
-    contenu = construire_reglages(statique, projet, identite, manifeste.sites,
-                                  Path.home().resolve(), os.getuid(),
-                                  zones_du_bac_a_sable(projet, identite, integration),
-                                  dossier_outil(), regles,
-                                  INTERDITS_INTEGRATION if integration else (),
-                                  dossier_source_cime())
-    return contenu
-
-
-def ecrire_reglages_generes(projet: Path, identite: str, role: str, manifeste: Manifeste,
-                            integration: bool = False, contenu: dict | None = None) -> Path:
-    """Écrit `<projet>/.orga/etat/reglages/<identité>.json` et crée les dossiers de travail."""
-    projet = Path(projet).resolve()
-    if contenu is None:
-        contenu = contenu_reglages_generes(projet, identite, role, manifeste, integration)
-    preparer_tmp(projet)
-    (dossier_memoire(projet) / identite).mkdir(parents=True, exist_ok=True)
-    fichier = fichier_reglages_generes(projet, identite)
-    fichier.parent.mkdir(parents=True, exist_ok=True)
-    fichier.write_text(json.dumps(contenu, indent=2, ensure_ascii=False) + "\n",
-                       encoding="utf-8")
-    return fichier
 
 
 def _dossier_equipe(projet: Path, equipe: str) -> Path:
@@ -402,11 +183,11 @@ def commande(projet: Path, manifeste: Manifeste, role: str, equipe: str | None,
         raise ErreurProjet(f"rôle inconnu : {role!r}")
     identite = _identite(role, equipe, tache)
     reglages_role = "coord" if _est_integration(role, equipe) else role
-    reglages(projet, reglages_role)  # présence vérifiée tôt : refus clair si absent
+    reglages.fichier_reglages_statique(projet, reglages_role)  # présence vérifiée tôt : refus clair si absent
     env = {VAR_AGENT: identite, VAR_PROJET: str(projet),
-           "CLAUDE_CODE_TMPDIR": str(dossier_tmp(projet))}
+           "CLAUDE_CODE_TMPDIR": str(reglages.dossier_tmp(projet))}
     ligne = ["claude", "--model", modele, "--permission-mode", "auto",
-             "--settings", str(fichier_reglages_generes(projet, identite))]
+             "--settings", str(reglages.fichier_reglages_generes(projet, identite))]
     ligne += ["--resume", reprise] if reprise else [message]
     if _est_integration(role, equipe):
         # une session d'intégration mesure sur des projets jetables : elle ne porte
@@ -570,13 +351,13 @@ def _lancer(args, projet: Path | None = None, attacher: bool = False) -> tuple[s
     role_reglages = "coord" if integration else role
     contenu = None
     if role != "assistant":   # l'Assistant ne tourne pas dans le bac à sable
-        contenu = contenu_reglages_generes(projet, identite, role_reglages, manifeste, integration)
+        contenu = reglages.contenu_reglages_generes(projet, identite, role_reglages, manifeste, integration)
     if args.essai_a_blanc:
         print(shlex.join(cmd))
         if contenu is not None:  # verdict statique seul : rien n'est lancé
             try:
-                verifier_import_cime(contenu["sandbox"], Path(os.path.realpath(_paquet_cime())),
-                                     sys.path)
+                reglages.verifier_import_cime(
+                    contenu["sandbox"], Path(os.path.realpath(reglages._paquet_cime())), sys.path)
                 print("autotest import cime (statique) : ok")
             except Refus as e:
                 print(f"autotest import cime (statique) : refus — {e}")
@@ -584,8 +365,9 @@ def _lancer(args, projet: Path | None = None, attacher: bool = False) -> tuple[s
             print(f"conversation : {reprise}\nfichier : {fichier}")
         return session, 0
     if contenu is not None:   # avant toute écriture : un refus ne laisse rien derrière lui
-        verifier_import_cime(contenu["sandbox"], *sonder_import_cime(python_de_l_outil()))
-    ecrire_reglages_generes(projet, identite, role_reglages, manifeste, integration, contenu)
+        reglages.verifier_import_cime(contenu["sandbox"],
+                                      *reglages.sonder_import_cime(reglages.python_de_l_outil()))
+    reglages.ecrire_reglages_generes(projet, identite, role_reglages, manifeste, integration, contenu)
     deplace = role == "worker" and not integration and not reprise_tache
     if deplace:
         en_cours.parent.mkdir(parents=True, exist_ok=True)

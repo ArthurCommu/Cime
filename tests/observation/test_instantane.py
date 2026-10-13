@@ -398,7 +398,7 @@ CLES = {
     "attente": {"id", "message_id", "objet", "nature", "titre", "bloque", "depuis", "agent", "equipe", "actions"},
     "alarme": {"id", "type", "gravite", "agents", "equipes", "depuis", "mesure", "quoi_faire", "destinataire"},
 }
-ETATS = {"travaille", "au_repos", "attend_autorisation", "attend_reponse", "arrete", "inconnu"}
+ETATS = {"travaille", "au_repos", "attend_autorisation", "attend_reponse", "arrete", "endormi", "inconnu"}
 TYPES = {"autorisation_en_attente", "question_sans_reponse", "recouvrement",
          "brouillon", "contexte_plein", "hors_perimetre", "retard_sur_base", "session_disparue", "action_refusee",
          "bloque_au_demarrage", "fige", "session_orpheline", "gros_poste", "contexte_au_repos",
@@ -532,6 +532,75 @@ def test_coordinateur_d_equipe_speciale_vu_dans_le_registre(base, faux):
     base.evt("coord-integration", "Stop", "Stop", 3)
     a = agent(snap(base.racine), "coord-integration")
     assert (a["vivant"], a["etat"], a["etat_source"]) == (False, "arrete", "tmux:session_absente")
+
+
+C = "coord-observation"
+
+
+def test_coordinateur_endormi_session_absente_est_endormi(base, faux):
+    base.sommeil("CoordEndormi", C, 5)
+    del faux.sessions[f"cc-{C}"]
+    a = agent(snap(base.racine), C)
+    assert (a["vivant"], a["etat"], a["etat_depuis"], a["etat_source"], a["session_tmux"]) == (
+        False, "endormi", iso(5), "registre:CoordEndormi", f"cc-{C}")
+
+
+def test_coordinateur_endormi_session_presente_n_est_pas_endormi(base, faux):
+    base.sommeil("CoordEndormi", C, 5)
+    a = agent(snap(base.racine), C)
+    assert a["vivant"] is True and a["etat"] != "endormi"
+
+
+def test_coordinateur_endormi_tmux_en_echec_mesure_habituelle(base, faux):
+    base.sommeil("CoordEndormi", C, 5)
+    faux.tmux_ok = False
+    a = agent(snap(base.racine), C)
+    assert (a["vivant"], a["etat"]) == (None, "inconnu")
+
+
+def test_coordinateur_endormi_puis_session_end_reste_endormi(base, faux):
+    base.sommeil("CoordEndormi", C, 5)
+    base.evt(C, "SessionEnd", "SessionEnd", 4)
+    del faux.sessions[f"cc-{C}"]
+    a = agent(snap(base.racine), C)
+    assert (a["vivant"], a["etat"], a["etat_source"], a["etat_depuis"]) == (
+        False, "endormi", "registre:CoordEndormi", iso(5))
+
+
+def test_coordinateur_reveille_retrouve_la_mesure_habituelle(base, faux):
+    base.sommeil("CoordEndormi", C, 9)
+    base.sommeil("CoordReveille", C, 5)
+    del faux.sessions[f"cc-{C}"]
+    a = agent(snap(base.racine), C)
+    assert (a["etat"], a["etat_source"]) == ("arrete", "tmux:session_absente")
+
+
+def test_worker_et_assistant_jamais_endormis(base, faux):
+    base.evt(W, "Stop", "Stop", 3)
+    base.sommeil("CoordEndormi", W, 5)
+    base.sommeil("CoordEndormi", "assistant", 5)
+    del faux.sessions[f"cc-{W}"]
+    del faux.sessions["cc-assistant"]
+    d = snap(base.racine)
+    assert agent(d, W)["etat"] == "arrete"
+    assert agent(d, "assistant")["etat"] != "endormi"
+
+
+def test_equipe_dont_le_coordinateur_dort_est_au_repos(base, faux):
+    base.evt(W, "Stop", "Stop", 3)
+    base.sommeil("CoordEndormi", C, 5)
+    del faux.sessions[f"cc-{C}"]
+    del faux.sessions[f"cc-{W}"]
+    d = snap(base.racine)
+    assert next(e for e in d["equipes"] if e["nom"] == "observation")["statut"] == "au_repos"
+
+
+def test_coordinateur_endormi_sans_alarme_de_session(base, faux):
+    base.sommeil("CoordEndormi", C, 5)
+    del faux.sessions[f"cc-{C}"]
+    d = snap(base.racine, 120)
+    assert [al for al in d["alarmes"] if C in al["agents"]
+            and al["type"] in ("session_disparue", "contexte_au_repos")] == []
 
 
 def test_rapport_action_lu(base, faux):

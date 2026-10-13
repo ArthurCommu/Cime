@@ -64,6 +64,15 @@ class Base:
         self.conn.commit()
         return cur.lastrowid
 
+    def sommeil(self, evenement, cible, minutes_ago):
+        """Événement de sommeil ou de réveil : sans agent en colonne, la cible est dans les détails."""
+        det = hook("Stop")
+        det["agent"] = cible
+        self.conn.execute(
+            "INSERT INTO evenements (horodatage, agent, session_id, evenement, details) VALUES (?,NULL,?,?,?)",
+            (iso(minutes_ago), det.get("session_id"), evenement, json.dumps(det)))
+        self.conn.commit()
+
     def msg(self, de, a, nature, minutes_ago, resume="x", en_reponse_a=None, equipe=None, fichier=None,
             id=None, objet=None, obligation=True):
         """Comme `cime envoyer` : le message, l'obligation que la matrice en tire, la transition
@@ -851,3 +860,44 @@ def test_non_lu_faux_apres_clos_et_pour_les_entrees_hook(base):
     base.evt("assistant", "Stop", "Stop", 2, last_assistant_message="fini")
     base.conn.commit()
     assert all(m["non_lu"] is False for m in lire(base)["fil"])
+
+
+# --- coordinateur endormi ----------------------------------------------------------
+
+C = "coord-observation"
+
+
+def test_endormi_seul_donne_l_horodatage_du_coord_endormi(base):
+    base.sommeil("CoordEndormi", C, 5)
+    assert lire(base)["endormis"] == {C: iso(5)}
+
+
+def test_reveil_apres_l_endormi_ne_dort_plus(base):
+    base.sommeil("CoordEndormi", C, 9)
+    base.sommeil("CoordReveille", C, 5)
+    assert lire(base)["endormis"] == {}
+
+
+def test_session_start_de_l_agent_apres_l_endormi_ne_dort_plus(base):
+    base.sommeil("CoordEndormi", C, 9)
+    base.evt(C, "SessionStart", "SessionStart", 5)
+    assert lire(base)["endormis"] == {}
+
+
+def test_session_start_de_l_agent_avant_l_endormi_sans_effet(base):
+    base.evt(C, "SessionStart", "SessionStart", 9)
+    base.sommeil("CoordEndormi", C, 5)
+    assert lire(base)["endormis"] == {C: iso(5)}
+
+
+def test_endormi_d_un_autre_agent_ne_compte_pas(base):
+    base.sommeil("CoordEndormi", "coord-page", 5)
+    assert lire(base)["endormis"] == {"coord-page": iso(5)}
+
+
+def test_endormis_sans_table_evenements_vide(tmp_path):
+    conn = sqlite3.connect(tmp_path / "vide.sqlite")
+    try:
+        assert registre._endormis(conn, {"messages"}) == {}
+    finally:
+        conn.close()

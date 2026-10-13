@@ -17,7 +17,7 @@ from cime.fondation import fermeture, invite
 from cime.fondation.projet import equipe_de, lire_manifeste, session_tmux
 from cime.fondation import registre
 from cime.fondation.registre import ouvrir
-from cime.signaux import courrier, echeances, hooks
+from cime.signaux import courrier, echeances, hooks, repos
 
 UTILISATEUR = "utilisateur"
 ASSISTANT = "assistant"
@@ -140,6 +140,22 @@ def superieur(agent, projet):
 def sessions_vivantes() -> set[str]:
     r = _tmux("list-sessions", "-F", "#{session_name}")
     return set(r.stdout.split()) if r.returncode == 0 else set()
+
+
+_SANS_SERVEUR = ("no server running", "No such file or directory")
+
+
+def sonde_sessions() -> set[str] | None:
+    """Les sessions tmux vivantes, ou None quand tmux ne répond pas (binaire absent, serveur
+    injoignable, refus du bac à sable) : un tmux muet n'est pas « zéro session ». L'absence de
+    serveur, elle, est bien zéro session."""
+    try:
+        r = _tmux("list-sessions", "-F", "#{session_name}")
+    except OSError:
+        return None
+    if r.returncode == 0:
+        return set(r.stdout.split())
+    return set() if any(m in (r.stderr or "") for m in _SANS_SERVEUR) else None
 
 
 def _capturer(session: str) -> str:
@@ -354,7 +370,10 @@ def livrer(ctx, agent) -> None:
     session = session_tmux(ctx.manifeste, agent)
     if session is None or session not in ctx.sessions:
         ctx.memoire.occupe_par[agent] = None
-        _episode(ctx, agent, "session-absente", next(iter(courrier.en_attente(ctx.conn, agent)), None))
+        message = next(iter(courrier.en_attente(ctx.conn, agent)), None)
+        if message is not None and repos.reveiller(ctx.projet, ctx.conn, agent):
+            return                  # endormi ou tombé : ce n'est pas une absence, on le réveille
+        _episode(ctx, agent, "session-absente", message)
         return
     _fin_episode(ctx, agent, "session-absente")
     ouvert = courrier.ouvert_de(ctx.conn, agent)
@@ -616,13 +635,16 @@ def _frapper(ctx, agent, session, pris) -> None:
 def sessions_absentes(ctx) -> None:
     """Un message `inscrit` depuis plus de 2 min et la session absente ⇒ `signalement
     session-absente:<agent>` à l'Assistant, une fois par message. Muet tant que le projet est
-    fermé ; les deux minutes repartent de la réouverture."""
+    fermé ; les deux minutes repartent de la réouverture. Muet aussi pour un coordinateur endormi ou tombé,
+    tant que son réveil n'a pas échoué."""
     if fermeture.est_ferme(ctx.projet):
         return
     for agent in courrier.agents_en_attente(ctx.conn):
         session = session_tmux(ctx.manifeste, agent)
         if session is None or session in ctx.sessions:
             continue
+        if repos.absence_attendue(ctx.projet, ctx.conn, agent):
+            continue                                # endormi ou tombé : on le réveille, il n'est pas perdu
         destinataire = UTILISATEUR if agent == ASSISTANT else ASSISTANT
         for m in courrier.en_attente(ctx.conn, agent):
             if (ctx.maintenant - echeances.depart(ctx.conn, m["horodatage"])).total_seconds() \
@@ -634,22 +656,8 @@ def sessions_absentes(ctx) -> None:
                            "(il sera remis à son retour)")
 
 
-def _fermeture_ordonnee(conn, agent, debut_id) -> bool:
-    """Un ordre `fermer` de cet agent (ou un `lancer … --remplacer`, qui ferme avant de reprendre),
-    en file ou exécuté, posé depuis le démarrage de la session (`SessionStart` n° debut_id) :
-    sa disparition est la fermeture propre, pas une panne."""
-    return conn.execute(
-        "SELECT 1 FROM ordres o, evenements e WHERE e.id = ? AND o.cible = ?"
-        " AND (o.verbe = 'fermer' OR (o.verbe = 'lancer' AND json_extract(o.parametres, '$.remplacer') = 1))"
-        " AND o.etat IN ('en_file', 'execute') AND o.horodatage >= e.horodatage LIMIT 1",
-        (debut_id, agent)).fetchone() is not None
-
-
-def _projet_ferme_apres(conn, evenement_id) -> bool:
-    """Un `ProjetFerme` suit cet événement : la session a été fermée avec le projet, pas perdue
-    (même statut que `_fermeture_ordonnee`)."""
-    return conn.execute("SELECT 1 FROM evenements WHERE evenement = 'ProjetFerme' AND id > ? LIMIT 1",
-                        (evenement_id,)).fetchone() is not None
+_fermeture_ordonnee = repos.fermeture_ordonnee
+_projet_ferme_apres = repos.projet_ferme_apres
 
 
 def _fermee_avec_le_projet(conn, evenement_id) -> bool:
@@ -664,7 +672,8 @@ def _fermee_avec_le_projet(conn, evenement_id) -> bool:
 def sessions_disparues(ctx) -> None:
     """Session absente alors que l'agent en avait une et qu'aucun `SessionEnd` ne suit son
     dernier `SessionStart` ⇒ `signalement session-disparue:<agent>` au supérieur, une fois
-    par session démarrée."""
+    par session démarrée. Une fermeture voulue (ordre `fermer`, projet fermé, coordinateur mis au repos)
+    n'est pas une disparition."""
     for agent, debut_id in ctx.conn.execute(
             "SELECT agent, max(id) FROM evenements WHERE evenement = 'SessionStart'"
             " AND agent IS NOT NULL GROUP BY agent").fetchall():
@@ -678,6 +687,8 @@ def sessions_disparues(ctx) -> None:
             continue                                # `cime terminer` : la fermeture est voulue
         if _projet_ferme_apres(ctx.conn, debut_id):
             continue                                # `cime fermer` : la disparition est voulue
+        if repos.endormi_depuis(ctx.conn, agent, debut_id):
+            continue                                # mis au repos par le facteur : la disparition est voulue
         sup = superieur(agent, ctx.projet)
         if sup:
             hooks.signaler_une_fois(

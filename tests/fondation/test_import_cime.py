@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from cime.fondation import lancer
+from cime.fondation import reglages as reglages_mod
 from cime.fondation.lancer import Refus
 from cime.fondation.nom import VAR_AGENT, VAR_PROJET
 from cime.fondation.reglages import bac_a_sable
@@ -18,7 +19,7 @@ IDENTITES = ("coord-equipe", "worker-equipe-tache", "worker-integration-r1")
 
 
 def lectures(source, outil=None, identite="coord-equipe"):
-    contenu = lancer.construire_reglages(
+    contenu = reglages_mod.construire_reglages(
         {}, PROJET, identite, [], HOME, 501, [PROJET], outil, source=source)
     return contenu["sandbox"]["filesystem"]["allowRead"]
 
@@ -62,7 +63,7 @@ def test_la_source_n_ajoute_aucune_ecriture():
 
 def test_dossier_source_cime_est_le_dossier_d_import_reel():
     import cime
-    source = lancer.dossier_source_cime()
+    source = reglages_mod.dossier_source_cime()
     if source is not None:
         assert (source / "cime").resolve() == Path(next(iter(cime.__path__))).resolve()
 
@@ -78,17 +79,17 @@ def test_controle_passe_quand_allow_read_couvre(tmp_path):
     (src / "cime").mkdir(parents=True)
     maison = tmp_path
     bac_ = {"filesystem": {"allowRead": [str(src)], "denyRead": [str(maison)]}}
-    assert lancer.import_cime_non_lisible(bac_, src / "cime", [str(src)]) == []
-    lancer.verifier_import_cime(bac_, src / "cime", [str(src)])
+    assert reglages_mod.import_cime_non_lisible(bac_, src / "cime", [str(src)]) == []
+    reglages_mod.verifier_import_cime(bac_, src / "cime", [str(src)])
 
 
 def test_controle_refuse_quand_allow_read_ne_couvre_pas(tmp_path):
     src = tmp_path / "src"
     (src / "cime").mkdir(parents=True)
     bac_ = {"filesystem": {"allowRead": [str(tmp_path / "autre")], "denyRead": [str(tmp_path)]}}
-    assert lancer.import_cime_non_lisible(bac_, src / "cime", [str(src), "/n/existe/pas"]) == [src]
+    assert reglages_mod.import_cime_non_lisible(bac_, src / "cime", [str(src), "/n/existe/pas"]) == [src]
     with pytest.raises(Refus) as e:
-        lancer.verifier_import_cime(bac_, src / "cime", [str(src)])
+        reglages_mod.verifier_import_cime(bac_, src / "cime", [str(src)])
     assert str(src) in str(e.value)
     assert "n'est pas couverte par les lectures de l'agent" in str(e.value)
     assert "uv tool" in str(e.value)
@@ -98,7 +99,7 @@ def test_hors_deny_read_la_lecture_est_libre(tmp_path):
     src = tmp_path / "src"
     (src / "cime").mkdir(parents=True)
     bac_ = {"filesystem": {"allowRead": [], "denyRead": ["/opt/jamais"]}}
-    assert lancer.import_cime_non_lisible(bac_, src / "cime", [str(src)]) == []
+    assert reglages_mod.import_cime_non_lisible(bac_, src / "cime", [str(src)]) == []
 
 
 # --- 3. le hook voit l'échec -------------------------------------------------------------

@@ -9,6 +9,7 @@ Quatre vérifications, chacune avec sa table de mutations (la vérification doit
     à partir des valeurs du CSS ; la mesure dans un vrai navigateur est dans outils/scenario_equipe.py (à lancer dans un navigateur).
 Sautées si node est absent (les deux dernières n'en ont pas besoin pour le calcul).
 """
+import copy
 import json
 import re
 import shutil
@@ -538,7 +539,7 @@ MUTATIONS_EXECUTEES = {
     "double repli (historique)": (EQ, "const repli = termines.length ? el('details', { class: 'eq-termines' },", "const repli = termines.length ? el('details', { class: 'historique' }, el('summary', {}, 'Historique'), el('details', { class: 'eq-termines' },", verifier_rendu),
     "périmètre sans résumé": (EQ, "return repli('eq-perimetre', resumePerimetre(q),\n    el('p'", "return repli('eq-perimetre', 'Périmètre et fichiers touchés',\n    el('p'", verifier_rendu),
     "dépendances sans résumé": (EQ, "repli('eq-dependances', resumeDependances(q, equipes),", "repli('eq-dependances', 'Dépendances',", verifier_rendu),
-    "terminal sans phrase si pas de session": (EQ, "if (!avecSession.length) return section('Terminal en direct', null, el('div', { class: 'inconnu-bloc' }, phraseSansTerminal(q, agents, sans)));", "if (!avecSession.length) return null;", verifier_rendu),
+    "terminal sans phrase si pas de session": (EQ, "  if (!avecSession.length) {\n    return section('Terminal en direct', null,", "  if (!avecSession.length) {\n    return null;\n    return section('Terminal en direct', null,", verifier_rendu),
     "agents vides sans phrase": (EQ, "} else if (!vivants.length) {\n    corps = el('div', { class: 'vide-calme' }, 'Aucun agent en cours.');", "} else if (!vivants.length) {\n    corps = null;", verifier_rendu),
     "fiche sans racine": (EQ, "ctx.contenu.append(el('div', { class: 'fiche' }, ...[", "ctx.contenu.append(...[", verifier_rendu),
 }
@@ -560,3 +561,102 @@ def test_couverture_des_verifications():
     toutes = {n for n, v in globals().items() if n.startswith("verifier_") and callable(v)}
     assert toutes == {"verifier_ordre", "verifier_hauteurs", "verifier_fonctions", "verifier_rendu"} and MUTATIONS and MUTATIONS_EXECUTEES, sorted(toutes)
     assert {v[3] for v in MUTATIONS_EXECUTEES.values()} == {verifier_fonctions, verifier_rendu}
+
+
+# ---------------------------------------------------------------------------
+# Le bloc « Terminal en direct » : un coordinateur endormi dort, il n'est pas illisible
+# ---------------------------------------------------------------------------
+SONDE_TERMINAL = DOM + r"""
+const e = await import(process.argv[2] + '/vues/equipe.js');
+const commun = await import(process.argv[2] + '/commun.js');
+const jeux = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const sortie = {};
+for (const [nom, jeu] of Object.entries(jeux)) {
+  const etat = jeu.etat;
+  const c = new Elt('main');
+  const source = { terminal: async () => ({ texte: 'ok', capture_a: etat.genere_a }), agentsAvecTerminal: (agents) => agents.filter((x) => x.session_tmux && x.vivant !== false) };
+  const arret = e.rendre({ etat, contenu: c, route: { page: 'equipe', nom: jeu.equipe, params: new URLSearchParams('') }, horloge: { maintenant: () => Date.parse(etat.genere_a) }, journal: [], tic() {}, source, rerendre() {} });
+  const fiche = c.children[0];
+  const bloc = sous(fiche).find((n) => n.tag === 'section' && sous(n).some((m) => m.tag === 'h2' && texte(m) === 'Terminal en direct'));
+  sortie[nom] = {
+    texte: bloc ? texte(bloc) : null,
+    inconnus: bloc ? a(bloc, 'inconnu-bloc').map(texte) : null,
+    endormis: bloc ? a(bloc, 'endormi').map(texte) : null,
+    heures: bloc ? a(bloc, 'endormi').flatMap((n) => sous(n).filter((m) => m.tag === 'time').map((m) => [m.attrs.datetime, m.dataset.age])) : null,
+    discrets: bloc ? a(bloc, 'discret').map(texte) : null,
+    noms: Object.fromEntries(jeu.ids.map((id) => [id, commun.nomAgent(id)])),
+  };
+  arret();
+}
+console.log(JSON.stringify(sortie));
+"""
+
+TERMINAL_ANCIEN = "Aucune session capturée en ce moment : les agents de cette équipe n’ont pas de session tmux lisible."
+
+
+def _terminal_jeux():
+    base = _exemple()
+    endormi = next(a for a in base["agents"] if a["id"] == "coord-livraison")
+    arrete = {**copy.deepcopy(endormi), "id": "coord-arrete", "etat": "arrete", "etat_depuis": "2026-10-07T11:00:00.000Z"}
+    worker = {**copy.deepcopy(endormi), "id": "w-session", "role": "worker", "etat": "travaille", "vivant": True,
+              "session_tmux": "cc-w-session", "etat_depuis": "2026-10-07T11:50:00.000Z"}
+
+    def jeu(agents, ids):
+        v = copy.deepcopy(base)
+        v["agents"] = [copy.deepcopy(a) for a in agents]
+        v["alarmes"] = []
+        return {"equipe": "livraison", "etat": v, "ids": ids}
+
+    return {
+        "un endormi seul": jeu([endormi], ["coord-livraison"]),
+        "endormi et illisible": jeu([endormi, arrete], ["coord-livraison", "coord-arrete"]),
+        "endormi avec terminal": jeu([endormi, worker], ["coord-livraison", "w-session"]),
+        "illisible seul": jeu([arrete], ["coord-arrete"]),
+    }
+
+
+def _terminal(dossier_static):
+    fichier = dossier_static / "jeux-terminal.json"
+    fichier.write_text(json.dumps(_terminal_jeux()), encoding="utf-8")
+    return _lancer(dossier_static, SONDE_TERMINAL, str(fichier))
+
+
+@needs_node
+def test_terminal_endormi(copie_static):
+    r = _terminal(copie_static)
+    nom = r["un endormi seul"]["noms"]["coord-livraison"]
+    seul = r["un endormi seul"]
+    # un endormi seul : il dort, depuis quand, il se réveille au prochain message ; rien ne parle de session illisible
+    assert seul["inconnus"] == [], seul
+    assert len(seul["endormis"]) == 1 and "dort" in seul["endormis"][0] and "au prochain message" in seul["endormis"][0], seul
+    assert "tmux" not in seul["texte"] and "capturée" not in seul["texte"], seul["texte"]
+    assert seul["heures"] == [["2026-10-07T12:20:11.123Z", "depuis"]], seul["heures"]  # l'âge vit : un élément time, daté
+    # un endormi et un coordinateur arrêté sans session : deux phrases distinctes, celle de l'illisible ne cite pas l'endormi
+    mele = r["endormi et illisible"]
+    assert mele["inconnus"] == [TERMINAL_ANCIEN], mele["inconnus"]
+    assert nom not in mele["inconnus"][0] and "dort" not in mele["inconnus"][0]
+    assert len(mele["endormis"]) == 1 and "dort" in mele["endormis"][0]
+    # un endormi avec un autre agent qui a un terminal : la ligne discrète dit qu'il dort, sans citer le terminal absent
+    avec = r["endormi avec terminal"]
+    assert avec["inconnus"] == [] and len(avec["endormis"]) == 1, avec
+    assert any("dort" in t for t in avec["discrets"]) and not any("capturée" in t for t in avec["discrets"]), avec["discrets"]
+    # sans endormi : la phrase d'origine, mot pour mot
+    assert r["illisible seul"]["inconnus"] == [TERMINAL_ANCIEN], r["illisible seul"]
+    assert r["illisible seul"]["endormis"] == []
+
+
+# la mutation remet l'ancienne phrase pour un endormi : la vérification doit alors échouer
+ENDORMI_COMME_ILLISIBLE = (EQ,
+    "  const dorment = sans.filter((a) => a.etat === 'endormi');\n  const illisibles = sans.filter((a) => a.etat !== 'endormi');",
+    "  const dorment = [];\n  const illisibles = sans;")
+
+
+@needs_node
+def test_mutation_endormi_comme_illisible(copie_static):
+    fichier, ancien, nouveau = ENDORMI_COMME_ILLISIBLE
+    cible = copie_static / fichier
+    texte = cible.read_text(encoding="utf-8")
+    assert ancien in texte, ancien  # la mutation doit s'appliquer
+    cible.write_text(texte.replace(ancien, nouveau, 1), encoding="utf-8")
+    with pytest.raises(AssertionError):
+        test_terminal_endormi(copie_static)

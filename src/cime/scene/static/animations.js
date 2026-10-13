@@ -5,7 +5,7 @@
 export const SEUIL_CONTEXTE_AMBRE = 0.6;
 // Les alarmes graves qui disent seulement qu'on attend quelqu'un : halo ambre ; toute autre alarme grave est un problème (rouge).
 export const TYPES_ATTENTE = Object.freeze(['autorisation_en_attente', 'question_sans_reponse']);
-export const ETATS_AGENT = ['travaille', 'au_repos', 'attend_autorisation', 'attend_reponse', 'arrete'];
+export const ETATS_AGENT = ['travaille', 'au_repos', 'endormi', 'attend_autorisation', 'attend_reponse', 'arrete'];
 export const ACTIVITES = Object.freeze({
   ecrire: { anim: 'ecrire', ecran: 'ecran.texte' },
   lire: { anim: 'lire', ecran: 'ecran.lecture' },
@@ -17,7 +17,7 @@ export const ACTIVITES = Object.freeze({
 export const TABLE = Object.freeze([
   { id: 1, animation: 'assis, taper', declencheur: 'agent travaille, sans activité connue (hypothèse : champ absent)', champ: 'agents[].etat', condition: 'etat == "travaille" et activite absent', couleur: 'normal' },
   { id: 2, animation: 'ecrire / lire / executer / reflechir, écran du bureau correspondant', declencheur: 'agent travaille avec une activité connue (champ facultatif)', champ: 'agents[].etat + agents[].activite', condition: 'etat == "travaille" et activite ∈ {ecrire, lire, executer, reflechir}', couleur: 'normal' },
-  { id: 3, animation: 'dormir + bulle zzz', declencheur: 'agent au repos', champ: 'agents[].etat', condition: 'etat == "au_repos"', couleur: 'normal' },
+  { id: 3, animation: 'dormir + bulle zzz', declencheur: 'agent au repos ou endormi', champ: 'agents[].etat', condition: 'etat == "au_repos" ou etat == "endormi"', couleur: 'normal' },
   { id: 4, animation: 'attend_reponse + bulle question ; enveloppe de la question visible vers le destinataire', declencheur: 'agent qui attend une réponse ; arête ouverte', champ: 'agents[].etat, aretes[]', condition: 'etat == "attend_reponse"', couleur: 'normal' },
   { id: 5, animation: 'attend_autorisation + bulle exclamation ambre + halo ambre', declencheur: 'agent qui attend une autorisation', champ: 'agents[].etat', condition: 'etat == "attend_autorisation"', couleur: 'ambre' },
   { id: 6, animation: 'coordinateur arrêté : chaise vide, bureau vide (un worker arrêté n’a pas de poste : voir 27)', declencheur: 'agent arrêté, coordinateur', champ: 'agents[].role, agents[].etat', condition: 'etat == "arrete" et role == "coordinateur"', couleur: 'gris' },
@@ -156,6 +156,7 @@ export function animationAgent(agent, contexte = {}) {
           out.ecran = 'ecran.eteint';
         }
         break;
+      case 'endormi':
       case 'au_repos':
         ligneSprite = 3;
         spriteAnim = 'dormir';

@@ -253,7 +253,14 @@ function sectionTerminal(q, agents, terminee) {
   const avecSession = ctx.source.agentsAvecTerminal(agents);
   // les workers terminés sont déjà comptés, repliés, dans « Ses agents » : on ne les redit pas ici
   const sans = agents.filter((a) => !avecSession.includes(a) && !workerTermine(a, etat.alarmes));
-  if (!avecSession.length) return section('Terminal en direct', null, el('div', { class: 'inconnu-bloc' }, phraseSansTerminal(q, agents, sans)));
+  // un coordinateur endormi n'est pas illisible : sa session est fermée volontairement, elle se rouvre au prochain message
+  const dorment = sans.filter((a) => a.etat === 'endormi');
+  const illisibles = sans.filter((a) => a.etat !== 'endormi');
+  if (!avecSession.length) {
+    return section('Terminal en direct', null,
+      illisibles.length || !dorment.length ? el('div', { class: 'inconnu-bloc' }, phraseSansTerminal(q, agents, illisibles)) : null,
+      dorment.length ? el('div', { class: 'agent-session endormi discret' }, phraseEndormis(dorment)) : null);
+  }
   if (!avecSession.some((a) => a.id === terminalChoisi.get(q.nom))) terminalChoisi.set(q.nom, avecSession[0].id);
 
   const choix = el('div', { class: 'terminal-choix', role: 'group', 'aria-label': 'Choisir l’agent' });
@@ -278,7 +285,8 @@ function sectionTerminal(q, agents, terminee) {
   }
   return section('Terminal en direct', 'rafraîchi toutes les 5 s',
     bloc,
-    sans.length ? el('div', { class: 'discret' }, `Pas de terminal à afficher pour ${sans.map((a) => nomAgent(a.id)).join(', ')} : leur session n’est pas capturée.`) : null);
+    illisibles.length ? el('div', { class: 'discret' }, `Pas de terminal à afficher pour ${illisibles.map((a) => nomAgent(a.id)).join(', ')} : leur session n’est pas capturée.`) : null,
+    dorment.length ? el('div', { class: 'agent-session endormi discret' }, phraseEndormis(dorment)) : null);
 }
 
 /** Pourquoi il n'y a pas de terminal : une phrase, selon ce qu'on sait de l'équipe. */
@@ -286,6 +294,13 @@ export function phraseSansTerminal(q, agents, sans) {
   if (!agents.length) return q.speciale ? 'Équipe à la demande, sans session : il n’y a pas de terminal tant qu’on ne la lance pas.' : 'Aucun agent vu pour cette équipe : il n’y a pas de terminal.';
   if (!sans.length) return 'Tous les agents de cette équipe ont terminé : il n’y a plus de session à regarder.';
   return 'Aucune session capturée en ce moment : les agents de cette équipe n’ont pas de session tmux lisible.';
+}
+
+/** Des coordinateurs endormis : ni illisibles ni en panne, leur session est fermée volontairement. Chacun dit depuis quand il dort. */
+export function phraseEndormis(dorment) {
+  const dort = dorment.map((a) => el('span', {}, nomAgent(a.id), ' dort', a.etat_depuis ? ' ' : '', age(a.etat_depuis, 'depuis')));
+  return el('span', {}, joindre(dort, ' · '),
+    dorment.length > 1 ? ' : ils se réveillent au prochain message.' : ' : il se réveille au prochain message.');
 }
 
 // ---------------------------------------------------------------------------

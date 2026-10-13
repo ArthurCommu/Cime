@@ -467,7 +467,7 @@ def verifier_rendu_ensemble(dossier_static):
         for onglet in ("organigramme", "dependances"):
             assert "erreur" not in r[nom][onglet], (nom, onglet, r[nom][onglet])
     assert r["onze equipes"]["dependances"]["graphe"] == 10 and r["onze equipes"]["dependances"]["listeDeps"] == 1
-    assert r["exemple"]["dependances"]["graphe"] == 5 and r["exemple"]["dependances"]["graphe"] > 0  # les 5 équipes actives de l'exemple
+    assert r["exemple"]["dependances"]["graphe"] == 6 and r["exemple"]["dependances"]["graphe"] > 0  # les 6 équipes non terminées de l'exemple, celle dont le coordinateur dort comprise
     assert "dépend de" in r["onze equipes"]["dependances"]["texte"]
     for nom, jeu in r.items():
         for onglet, vue in jeu.items():

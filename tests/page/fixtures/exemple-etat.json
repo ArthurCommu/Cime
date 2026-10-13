@@ -371,6 +371,47 @@
       "occupe_par": "tour"
     },
     {
+      "id": "coord-livraison",
+      "role": "coordinateur",
+      "equipe": "livraison",
+      "parent": "assistant",
+      "session_tmux": null,
+      "vivant": false,
+      "etat": "endormi",
+      "etat_depuis": "2026-10-07T12:20:11.123Z",
+      "etat_source": "registre:CoordEndormi",
+      "tache": null,
+      "derniere_phrase": "Le paquet d'installation est prêt ; j'attends la prochaine consigne de l'Assistant.",
+      "modele": "claude-opus-5-5",
+      "contexte": {
+        "tokens": 140000,
+        "limite": 1000000,
+        "source": "transcript"
+      },
+      "cout_usd_estime": null,
+      "consommation": {
+        "15min": {
+          "lus": 0,
+          "ecrits": 0,
+          "tours": 0,
+          "contexte_moyen": null,
+          "dont_sous_agents": 0
+        },
+        "60min": {
+          "lus": 0,
+          "ecrits": 0,
+          "tours": 0,
+          "contexte_moyen": null,
+          "dont_sous_agents": 0
+        },
+        "source": "transcript"
+      },
+      "brouillon": null,
+      "dettes": [],
+      "file": [],
+      "occupe_par": null
+    },
+    {
       "id": "coord-cadrage",
       "role": "coordinateur",
       "equipe": "cadrage",
@@ -784,6 +825,33 @@
         "hote",
         "page"
       ]
+    },
+    {
+      "nom": "livraison",
+      "mission": "Empaqueter l'application et préparer l'installation dans un nouveau projet.",
+      "speciale": false,
+      "statut": "au_repos",
+      "cloturee_le": null,
+      "branche": "equipe/livraison",
+      "commit": "e5d2b80",
+      "worktree": "/home/exemple/projet-boutique-livraison",
+      "avancement": {
+        "faites": 3,
+        "en_cours": 0,
+        "a_faire": 0
+      },
+      "fichiers_touches": [
+        "src/cime/livraison/paquet.py",
+        "tests/livraison/test_paquet.py"
+      ],
+      "perimetre_declare": [
+        "src/cime/livraison/",
+        "tests/livraison/"
+      ],
+      "hors_perimetre": [],
+      "retard_sur_base": 0,
+      "en_avance_sur_base": 0,
+      "depend_de": []
     },
     {
       "nom": "cadrage",

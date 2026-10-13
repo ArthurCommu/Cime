@@ -1,0 +1,24 @@
+{
+  "marque": "assistant",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "exemple hook Stop"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(ls*)"
+    ],
+    "deny": [
+      "Bash(rm*)"
+    ]
+  },
+  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/assistant"
+}
