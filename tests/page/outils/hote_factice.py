@@ -7,6 +7,9 @@ Réglages (pour le test seulement) : GET /test/regler?cle=valeur
   calme : en plus, il ne reste que les alarmes d'information)
   autonome=inactif|actif|suspendu|absent|sans_proposees   (le mode autonome, champ `fusions_auto` de l'état : l'exemple est inactif, avec la liste proposée ;
   `absent` = un vieil hôte sans le champ ; POST /api/actions/fusions-auto {valeur} le fait changer, `suspendu` + `active` = réactivation, comme l'hôte réel)
+  charge=normal|inconnu|defaut|projet_plus_bas|un_actif   (le bloc `charge` : normal = plafond de la machine 6, sans limite du projet ; inconnu = `charge: null` ;
+  defaut = la machine au plafond par défaut, sans limite du projet ; projet_plus_bas = le plafond du projet (4) est plus bas que celui de la machine (6) ; un_actif = un seul worker actif ;
+  POST /api/actions/plafond {valeur: 1..8 | "defaut"} change le plafond de la machine et la phrase de l'écran, comme l'hôte réel)
   (jeu=reel : un état réaliste pour mesurer Supervision — 8 équipes visibles, integration spéciale sans session, 1 clôturée,
    6 alarmes à voir dont des doublons de type, 8 infos ; l'exemple d'état de la page n'est pas modifié)
 Sert aussi la scène (/scene/…) et GET /api/flux?depuis= en JSON.
@@ -31,7 +34,8 @@ ETAT = json.loads((EXEMPLES / "exemple-etat.json").read_text())
 ETAT_EXEMPLE = json.loads(json.dumps(ETAT))  # l'exemple tel qu'il est, pour dériver les états du mode autonome
 JOURNAL = json.loads((EXEMPLES / "exemple-journal.json").read_text())["lignes"]
 TERMINAUX = json.loads((EXEMPLES / "exemple-terminaux.json").read_text())
-REGLAGES = {"flux": "normal", "actions": "ok", "etat": "ok", "jeu": "exemple", "autonome": "inactif", "attentes": "normales"}
+REGLAGES = {"flux": "normal", "actions": "ok", "etat": "ok", "jeu": "exemple", "autonome": "inactif", "attentes": "normales", "charge": "normal"}
+PLAFOND_DEFAUT = 3
 REQUETES = []
 VERROU = threading.Lock()
 GENERE = {"t": time.time()}
@@ -114,6 +118,58 @@ def basculer_autonome(corps):
         JOURNAL.append({"id": len(JOURNAL) + 100, "horodatage": maintenant_iso(), "auteur": "utilisateur", "action": "fusions_auto", "cible": "projet",
                         "details": {"valeur": valeur, "avant": avant, "reglage_id": len(JOURNAL) + 1}, "resultat": "ok"})
     return {"resultat": "ok", "message": "fait"}
+
+
+def charge_reglee(nom):
+    """Le bloc `charge` dans l'un de ses états ; None = mesure en échec. Dérivé de l'exemple."""
+    base = json.loads(json.dumps(ETAT_EXEMPLE["charge"]))
+    if nom == "inconnu":
+        return None
+    if nom == "normal":
+        base.update(projet=None, source="machine", workers_max=base["machine"]["valeur"])
+    if nom == "defaut":
+        base["machine"] = {"valeur": PLAFOND_DEFAUT, "source": "defaut", "depuis": None, "par": None}
+        base.update(projet=None, source="machine", workers_max=PLAFOND_DEFAUT)
+    if nom == "un_actif":
+        base.update(workers_actifs=1, par_projet={"boutique": 1})
+    return base
+
+
+def regler_charge(nom):
+    with VERROU:
+        ETAT["charge"] = charge_reglee(nom)
+
+
+def regler_plafond(corps):
+    """POST /api/actions/plafond : comme l'hôte (mêmes messages). Renvoie la réponse { resultat, message }."""
+    valeur = corps.get("valeur")
+    with VERROU:
+        charge = ETAT.get("charge")
+        if charge is None:
+            charge = ETAT["charge"] = charge_reglee("normal")
+        machine = charge["machine"]
+        if valeur == "defaut":
+            if machine["source"] == "defaut":
+                return {"resultat": "refuse", "message": "déjà au défaut"}
+            nouveau = {"valeur": PLAFOND_DEFAUT, "source": "defaut", "depuis": maintenant_iso(), "par": "utilisateur"}
+            message = f"plafond de workers : défaut ({PLAFOND_DEFAUT})"
+        elif isinstance(valeur, int) and not isinstance(valeur, bool) and 1 <= valeur <= 8:
+            if machine["source"] == "fichier" and machine["valeur"] == valeur:
+                return {"resultat": "refuse", "message": f"déjà {valeur}"}
+            nouveau = {"valeur": valeur, "source": "fichier", "depuis": maintenant_iso(), "par": "utilisateur"}
+            message = f"plafond de workers : {valeur}"
+        else:
+            return {"resultat": "refuse", "message": "valeur attendue : un entier de 1 à 8, ou « defaut »"}
+        charge["machine"] = nouveau
+        projet = charge["projet"]
+        charge["source"] = "projet" if projet is not None and projet < nouveau["valeur"] else "machine"
+        charge["workers_max"] = projet if charge["source"] == "projet" else nouveau["valeur"]
+        JOURNAL.append({"id": len(JOURNAL) + 100, "horodatage": maintenant_iso(), "auteur": "utilisateur", "action": "plafond", "cible": "machine",
+                        "details": {"valeur": valeur}, "resultat": "ok"})
+    return {"resultat": "ok", "message": message}
+
+
+ETAT["charge"] = charge_reglee("normal")
 
 
 def instantane():
@@ -274,6 +330,8 @@ class Gestion(BaseHTTPRequestHandler):
         corps = entree.get("corps", {})
         if action == "fusions-auto":
             return self.repondre(200, basculer_autonome(corps))
+        if action == "plafond":
+            return self.repondre(200, regler_plafond(corps))
         attente = corps.get("attente_id")
         if isinstance(attente, list):
             attente = attente[0]
@@ -294,6 +352,8 @@ class Gestion(BaseHTTPRequestHandler):
                 REGLAGES[cle] = valeurs[0]
                 if cle == "autonome":
                     regler_autonome(valeurs[0])
+                if cle == "charge":
+                    regler_charge(valeurs[0])
             return self.repondre(200, REGLAGES)
         if u.path == "/test/requetes":
             return self.repondre(200, REQUETES)

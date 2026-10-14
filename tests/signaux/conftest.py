@@ -44,3 +44,12 @@ def _aucun_worker_vivant(monkeypatch):
     vivante. Un test qui veut un plafond atteint pose ses sessions."""
     from cime.signaux import ordres
     monkeypatch.setattr(ordres, "_sessions_vivantes", lambda: set())
+
+
+@pytest.fixture(autouse=True)
+def _jamais_le_vrai_dossier_de_config(monkeypatch, tmp_path_factory):
+    """Aucun test n'atteint le vrai `~/.config` : le dossier de configuration et le dossier
+    personnel sont des dossiers temporaires du test. Les tests du plafond de la machine y posent
+    (ou y lisent) le fichier de réglages."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("config")))
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("maison")))

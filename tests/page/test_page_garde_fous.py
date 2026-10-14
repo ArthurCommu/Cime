@@ -73,6 +73,7 @@ ROUTES_DE_L_HOTE = {
     "/api/actions/cloturer",
     "/api/actions/demander",
     "/api/actions/fusions-auto",  # le mode autonome, prérogative de l'utilisateur
+    "/api/actions/plafond",  # le plafond de workers de la machine, prérogative de l'utilisateur
 }
 
 RE_URL = re.compile(r"""(?:https?:)?//([a-z0-9.-]+\.[a-z]{2,})""", re.IGNORECASE)

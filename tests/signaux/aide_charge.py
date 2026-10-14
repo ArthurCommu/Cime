@@ -4,6 +4,8 @@ import json
 import pytest
 
 from aide import fabriquer_projet
+from aide_machine import fixer_machine
+from cime.fondation import plafond
 from cime.fondation.registre import ouvrir
 from cime.signaux import ordres
 
@@ -15,6 +17,7 @@ def projet(tmp_path, monkeypatch):
     racine = fabriquer_projet(tmp_path / "depot")
     monkeypatch.setenv("CIME_PROJET", str(racine))
     monkeypatch.setenv("CIME_ATTENTE_ORDRE", "0")
+    fixer_machine(plafond.dossier_reglages(), 1)      # un seul worker à la fois sur cette machine
     return racine
 
 

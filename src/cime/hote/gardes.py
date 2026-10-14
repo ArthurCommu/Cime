@@ -67,7 +67,7 @@ class Gardes:
         self.envoyer = list(envoyer) if envoyer is not None else ["cime", "envoyer"]
         # `accorder`/`refuser` : la décision de l'utilisateur sur un accord de fusion ou de chantier ;
         # None quand la commande d'envoi est substituée (essais) : la même sert à tout.
-        self.accorder = self.refuser = self.fusions_auto = None
+        self.accorder = self.refuser = self.fusions_auto = self.plafond = None
         if repondre is not None:
             self.repondre = list(repondre)
         elif self.envoyer[-1:] == ["envoyer"]:
@@ -75,6 +75,7 @@ class Gardes:
             self.accorder = [*self.envoyer[:-1], "accorder"]
             self.refuser = [*self.envoyer[:-1], "refuser"]
             self.fusions_auto = [*self.envoyer[:-1], "fusions-auto"]
+            self.plafond = [*self.envoyer[:-1], "plafond"]
         else:  # commande d'envoi substituée (essais) : la même sert aux deux
             self.repondre = list(self.envoyer)
 
@@ -94,12 +95,16 @@ class Gardes:
             return self._refuser(argv[len(self.refuser):])
         if self.fusions_auto is not None and argv[: len(self.fusions_auto)] == self.fusions_auto:
             return self._fusions_auto(argv[len(self.fusions_auto):])
+        if self.plafond is not None and argv[: len(self.plafond)] == self.plafond:
+            return self._plafond(argv[len(self.plafond):])
         if self.accorder is None and argv[: len(self.envoyer)] == self.envoyer:
             reste = argv[len(self.envoyer):]
             if len(reste) == 1 and _ENTIER.fullmatch(reste[0]):  # forme de `accorder <id>` (essais)
                 return None
             if self.fusions_auto is None and reste[:1] == ["fusions-auto"]:  # idem (essais)
                 return self._fusions_auto(reste[1:])
+            if self.plafond is None and reste[:1] == ["plafond"]:  # idem (essais)
+                return self._plafond(reste[1:])
         if argv[: len(self.repondre)] == self.repondre:
             reste = argv[len(self.repondre):]
             if self.repondre != self.envoyer or (reste and reste[0].isdigit()):
@@ -212,6 +217,11 @@ class Gardes:
         """`fusions-auto active|inactive` : la valeur, et rien d'autre (l'utilisateur seul, par `CIME_AGENT`)."""
         if len(a) != 1 or a[0] not in ("active", "inactive"):
             raise Interdit("fusions-auto : active ou inactive, et rien d'autre")
+
+    def _plafond(self, a: list[str]) -> None:
+        """`plafond <1..8>` ou `plafond --defaut` : l'écriture seulement, jamais la lecture."""
+        if len(a) != 1 or not (a[0] == "--defaut" or re.fullmatch(r"[1-8]", a[0])):
+            raise Interdit("plafond : un entier de 1 à 8 ou --defaut, et rien d'autre")
 
     # -- exécution -------------------------------------------------------
     def executer(

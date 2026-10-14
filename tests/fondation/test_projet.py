@@ -21,12 +21,12 @@ def manifeste(tmp_path, suite=""):
     return racine
 
 
-def test_workers_max_vaut_1_par_defaut(tmp_path):
-    assert lire_manifeste(manifeste(tmp_path)).workers_max == 1
+def test_workers_max_absent_vaut_none(tmp_path):
+    assert lire_manifeste(manifeste(tmp_path)).workers_max is None
 
 
-def test_table_charge_sans_la_cle_vaut_1(tmp_path):
-    assert lire_manifeste(manifeste(tmp_path, "[charge]\n")).workers_max == 1
+def test_table_charge_sans_la_cle_vaut_none(tmp_path):
+    assert lire_manifeste(manifeste(tmp_path, "[charge]\n")).workers_max is None
 
 
 def test_workers_max_lu(tmp_path):

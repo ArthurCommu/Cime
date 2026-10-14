@@ -93,7 +93,7 @@ def noms_equipes(e):
 def verifier_racine(e):
     cles(e, ["version", "genere_a", "duree_collecte_ms", "projet", "sources", "agents",
              "equipes", "fil", "flux", "aretes", "ordres", "facteur", "attentes_utilisateur", "consommation", "alarmes",
-             "sessions_hors_organigramme", "decisions_recentes", "fusions_auto"], "racine")
+             "sessions_hors_organigramme", "decisions_recentes", "fusions_auto", "charge"], "racine")
     assert e["version"] == 2
     horo(e["genere_a"])
     assert isinstance(e["duree_collecte_ms"], int) and 0 <= e["duree_collecte_ms"] < 2000
@@ -612,6 +612,24 @@ def verifier_flux(e):
     assert "cime" not in agents
 
 
+def verifier_charge(e):
+    """La charge de la machine : le plafond en vigueur est le plus bas de la machine et du projet ; les comptes par projet font le total."""
+    c = e["charge"]
+    cles(c, ["workers_max", "source", "machine", "projet", "workers_actifs", "par_projet"], "charge")
+    m = c["machine"]
+    cles(m, ["valeur", "source", "depuis", "par"], "charge.machine")
+    assert isinstance(m["valeur"], int) and 1 <= m["valeur"] <= 8 and m["source"] in ("fichier", "defaut")
+    assert (m["depuis"] is None) == (m["par"] is None)
+    if m["depuis"] is not None:
+        horo(m["depuis"])
+    assert c["projet"] is None or (isinstance(c["projet"], int) and c["projet"] >= 1)
+    plus_bas = c["projet"] is not None and c["projet"] < m["valeur"]
+    assert c["source"] == ("projet" if plus_bas else "machine")
+    assert c["workers_max"] == (c["projet"] if plus_bas else m["valeur"])
+    assert c["workers_actifs"] == sum(c["par_projet"].values()), "le compte de la machine est la somme des comptes par projet"
+    assert all(isinstance(n, int) and n >= 0 for n in c["par_projet"].values())
+
+
 def verifier_consommation(e):
     """Consommation de jetons (agents, racine, gros postes) et ses deux alarmes."""
     racine = e["consommation"]
@@ -802,6 +820,7 @@ def test_action_refusee(etat): verifier_action_refusee(etat)
 def test_alarmes_coherence(etat): verifier_alarmes_coherence(etat)
 def test_sessions_et_decisions(etat): verifier_sessions_et_decisions(etat)
 def test_flux(etat): verifier_flux(etat)
+def test_charge(etat): verifier_charge(etat)
 def test_references(etat): verifier_references(etat)
 def test_horodatages(etat): verifier_horodatages(etat)
 def test_confidentialite_etat(etat): verifier_confidentialite(etat)
@@ -1377,6 +1396,13 @@ def _repos_sans_contexte(e): agent(e, "coord-fondation")["contexte"] = None
 
 def _gros_poste_grave(e): alarme(e, "gros_poste")["gravite"] = "grave"
 def _gros_poste_id_disc(e): alarme(e, "gros_poste")["id"] = "gros_poste:coord-observation:1"
+def _charge_max_faux(e): e["charge"]["workers_max"] = e["charge"]["machine"]["valeur"]
+def _charge_source_fausse(e): e["charge"]["source"] = "machine"
+def _charge_somme_fausse(e): e["charge"]["workers_actifs"] += 1
+def _charge_machine_hors_bornes(e): e["charge"]["machine"]["valeur"] = 9
+def _charge_depuis_sans_par(e): e["charge"]["machine"]["par"] = None
+def _charge_cle_en_trop(e): e["charge"]["extra"] = 1
+
 def _repos_id_epoch(e): alarme(e, "contexte_au_repos")["id"] = "contexte_au_repos:coord-fondation:hier"
 
 def _flux_desordre(e): e["flux"].reverse()
@@ -1549,6 +1575,12 @@ ETAT_MUTATIONS = [
     ("1.24: alarme gros_poste grave", verifier_alarmes_gravite, _gros_poste_grave),
     ("1.24: id gros_poste avec discriminant", verifier_alarmes_id, _gros_poste_id_disc),
     ("1.24: id contexte_au_repos avec mauvais epoch", verifier_alarmes_id, _repos_id_epoch),
+    ("charge: plafond en vigueur ≠ le plus bas", verifier_charge, _charge_max_faux),
+    ("charge: source ≠ celui qui s'applique", verifier_charge, _charge_source_fausse),
+    ("charge: actifs ≠ somme par projet", verifier_charge, _charge_somme_fausse),
+    ("charge: plafond de machine hors 1..8", verifier_charge, _charge_machine_hors_bornes),
+    ("charge: date sans auteur", verifier_charge, _charge_depuis_sans_par),
+    ("charge: clé en trop", verifier_charge, _charge_cle_en_trop),
     ("références: fil.de inconnu", verifier_references, _de_inconnu),
     ("références: alarme.agents inconnu", verifier_references, _alarme_agent_inconnu),
     ("références: alarme.equipes inconnue", verifier_references, _alarme_equipe_inconnue),

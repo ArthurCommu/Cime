@@ -2222,5 +2222,21 @@
     "chantiers_24h": 0,
     "chantiers_max": null,
     "decisions": []
+  },
+  "charge": {
+    "workers_max": 4,
+    "source": "projet",
+    "machine": {
+      "valeur": 6,
+      "source": "fichier",
+      "depuis": "2026-10-07T09:12:03.512Z",
+      "par": "utilisateur"
+    },
+    "projet": 4,
+    "workers_actifs": 5,
+    "par_projet": {
+      "blog": 1,
+      "boutique": 4
+    }
   }
 }

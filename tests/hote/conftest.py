@@ -139,6 +139,22 @@ def projet_et_agent_isoles(tmp_path_factory, monkeypatch):
     monkeypatch.delenv("CIME_AGENT", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def config_machine_isolee(tmp_path_factory, monkeypatch):
+    """Le plafond de la machine vit dans le dossier de configuration personnel : jamais le vrai."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("cime-config")))
+
+
+def test_xdg_config_home_n_est_pas_le_vrai_dossier_de_configuration():
+    import os
+    from pathlib import Path
+
+    vrai = (Path.home() / ".config").resolve()
+    config = Path(os.environ["XDG_CONFIG_HOME"]).resolve()
+    assert os.path.isabs(os.environ["XDG_CONFIG_HOME"])
+    assert not (config == vrai or vrai in config.parents or config in vrai.parents)
+
+
 def test_cime_projet_n_est_pas_le_vrai_projet():
     import os
     from pathlib import Path

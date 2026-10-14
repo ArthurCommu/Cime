@@ -10,6 +10,7 @@ import {
   phraseAttente, estNonLu, repereNonLu, libelleNature, routeEquipe, routeFil,
 } from '../commun.js';
 import { interrupteurMode, encadreMode, blocTiroirMode } from './mode-autonome.js';
+import { ligneWorkers } from './workers.js';
 
 export const MAX_ATTENTES = 3;
 export const MAX_ALARMES = 3;
@@ -61,7 +62,7 @@ function blocAttentes(etat, nouvelles, clignote, redessiner) {
   const attentes = attentesOuvertes(etat);
   // le mode autonome : l'interrupteur à droite du titre, l'encadré sous lui, quoi que dise le reste du bloc (rien n'attend, inconnu…)
   const mode = interrupteurMode(etat);
-  const encadre = encadreMode(etat, redessiner);
+  const encadre = [encadreMode(etat, redessiner), ligneWorkers(etat, redessiner)];
   if (attentes === null) {
     return blocRail(titre, null, null, [encadre, el('div', { class: 'inconnu-bloc' }, 'Ce qui t’attend : inconnu (sources en échec).')], classe, mode);
   }

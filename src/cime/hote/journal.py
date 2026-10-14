@@ -15,6 +15,7 @@ Forme des lignes (`GET /api/journal?limite=N` → `{"lignes": [...]}`, récent d
 | demander             | `assistant`        | `{texte}` (la demande, une ligne, ≤ 160 caractères) |
 | cloturer             | `equipe:<nom>`     | `{demande}` (`msg-<id>` de la demande retenue, null si refus avant) |
 | fusions_auto         | `projet`           | `{valeur, avant, reglage_id}` (`avant` : `active`/`inactive` lu avant la commande, null si la valeur est refusée ; `reglage_id` : entier imprimé par la commande, null sinon) |
+| plafond              | `machine`          | `{valeur, avant, horodatage}` (`avant` : plafond de la machine lu avant la commande, entier, null si la valeur est refusée ; `horodatage` : imprimé par la commande, null sinon) |
 
 Les valeurs connues seulement après l'action (chemins rangés, demande retenue) sont
 ajoutées par `faire` en modifiant le dict `details` : `executer_action` le réécrit

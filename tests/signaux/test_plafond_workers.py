@@ -2,6 +2,8 @@
 import pytest
 
 from aide import cime, fabriquer_projet, lignes
+from aide_machine import fixer_machine
+from cime.fondation import plafond
 from cime.signaux import ordres, reprise
 
 WORKER = {"role": "worker", "equipe": "x", "modele": "m"}
@@ -11,12 +13,12 @@ WORKER = {"role": "worker", "equipe": "x", "modele": "m"}
 def projet(tmp_path, monkeypatch):
     racine = fabriquer_projet(tmp_path / "depot")
     monkeypatch.setenv("CIME_PROJET", str(racine))
+    fixer_machine(plafond.dossier_reglages(), 1)      # un seul worker à la fois sur cette machine
     return racine
 
 
 def regler(projet, workers_max):
-    fichier = projet / ".orga" / "projet.toml"
-    fichier.write_text(fichier.read_text() + f"\n[charge]\nworkers_max = {workers_max}\n")
+    fixer_machine(plafond.dossier_reglages(), workers_max)
 
 
 @pytest.fixture

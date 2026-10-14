@@ -17,6 +17,7 @@ import re
 import time
 from pathlib import Path
 
+from cime.fondation import plafond
 from cime.fondation.projet import ErreurProjet, lire_manifeste, session_tmux
 from cime.fondation.registre import horodatage, inscrire_transition, ouvrir
 from cime.signaux import commandes, obligations, repos
@@ -312,7 +313,8 @@ def _prendre_ordre(projet, identifiant):
 def compter_workers(sessions) -> int:
     """Nombre de sessions de worker parmi `sessions` : celles dont le nom contient `-worker-`,
     quel que soit le préfixe (un seul serveur tmux voit tous les projets de la machine).
-    Limite connue : une session tmux étrangère nommée `…-worker-…` compterait aussi."""
+    Limite connue : un worker lancé hors tmux n'est pas vu, et une session tmux étrangère nommée
+    `…-worker-…` compterait aussi."""
     return sum("-worker-" in nom for nom in sessions)
 
 
@@ -323,56 +325,131 @@ def _sessions_vivantes() -> set[str] | None:
 
 
 def chemin_charge(projet) -> Path:
-    """Le compte de workers actifs que le facteur inscrit pour les agents."""
+    """Ce que le facteur inscrit pour les agents, qui ne voient ni tmux ni les réglages de la machine."""
     return Path(projet) / ".orga" / "etat" / "charge.json"
 
 
-def _compte_inscrit(projet) -> int | None:
+def _miroir(projet) -> dict:
+    """Le contenu du fichier du facteur ; vide s'il est absent, illisible ou n'est pas un objet."""
     try:
-        compte = json.loads(chemin_charge(projet).read_text(encoding="utf-8"))["workers_actifs"]
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
+        donnees = json.loads(chemin_charge(projet).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return donnees if isinstance(donnees, dict) else {}
+
+
+def _compte_inscrit(projet) -> int | None:
+    compte = _miroir(projet).get("workers_actifs")
     return compte if isinstance(compte, int) and not isinstance(compte, bool) and compte >= 0 \
         else None
 
 
+def _plafond_machine_inscrit(projet) -> tuple[int, str] | None:
+    miroir = _miroir(projet)
+    valeur, source = miroir.get("plafond_machine"), miroir.get("source_machine")
+    if plafond.valeur_valide(valeur) and source in (plafond.FICHIER_SOURCE, plafond.DEFAUT_SOURCE):
+        return valeur, source
+    return None
+
+
+def prefixe_de_session(nom: str) -> str:
+    """Ce qui précède `-worker-` : le préfixe du projet qui a lancé la session."""
+    return nom.partition("-worker-")[0]
+
+
+def workers_par_projet(sessions) -> dict[str, int]:
+    """Les workers actifs regroupés par préfixe de projet."""
+    comptes: dict[str, int] = {}
+    for nom in sessions:
+        if "-worker-" in nom:
+            prefixe = prefixe_de_session(nom)
+            comptes[prefixe] = comptes.get(prefixe, 0) + 1
+    return comptes
+
+
+def _detail_inscrit(projet) -> dict[str, int] | None:
+    detail = _miroir(projet).get("par_projet")
+    if isinstance(detail, dict) and all(
+            isinstance(prefixe, str) and isinstance(n, int) and not isinstance(n, bool) and n >= 0
+            for prefixe, n in detail.items()):
+        return detail
+    return None
+
+
+def workers_vus(projet, sessions) -> tuple[int | None, dict[str, int] | None]:
+    """(workers actifs, détail par préfixe de projet) tels que l'appelant les voit : par tmux s'il
+    répond, sinon par le miroir du facteur quand son battement est frais ; (None, None) quand on ne
+    sait pas. Chaque moitié du miroir se juge seule."""
+    if sessions is not None:
+        return compter_workers(sessions), workers_par_projet(sessions)
+    from cime.lanceur.surveillant import battement_frais
+    if not battement_frais(Path(projet)):
+        return None, None
+    return _compte_inscrit(projet), _detail_inscrit(projet)
+
+
 def inscrire_charge(projet) -> bool:
-    """Le facteur, qui voit tmux, inscrit le nombre de workers actifs ; seulement quand il change.
-    Écriture atomique (fichier voisin puis remplacement). Renvoie True s'il a écrit. Tmux muet :
-    rien n'est inscrit."""
+    """Le facteur, qui voit tmux et les réglages, inscrit pour les agents ce qu'ils ne peuvent pas
+    voir : les workers actifs (total et par projet) et le plafond de la machine. Réécrit seulement
+    quand l'une de ces valeurs change, de façon atomique (fichier voisin puis remplacement).
+    Renvoie True s'il a écrit. Tmux muet : rien n'est inscrit."""
     sessions = _sessions_vivantes()
     if sessions is None:
         return False
-    actifs = compter_workers(sessions)
-    if _compte_inscrit(projet) == actifs:
+    valeur, source = plafond.lire_machine()
+    voulu = {"workers_actifs": compter_workers(sessions), "plafond_machine": valeur,
+             "source_machine": source, "par_projet": workers_par_projet(sessions)}
+    if _miroir(projet) == voulu:
         return False
     chemin = chemin_charge(projet)
     chemin.parent.mkdir(parents=True, exist_ok=True)
     temporaire = chemin.with_name(chemin.name + ".tmp")
-    temporaire.write_text(json.dumps({"workers_actifs": actifs}), encoding="utf-8")
+    temporaire.write_text(json.dumps(voulu), encoding="utf-8")
     os.replace(temporaire, chemin)
     return True
 
 
+def plafond_machine(projet, sessions) -> tuple[int, str]:
+    """(plafond de la machine, source). Un appelant qui voit tmux (le facteur, l'utilisateur) lit le
+    fichier de réglages ; sans tmux (un agent), le plafond inscrit par le facteur quand son
+    battement est frais, sinon la lecture directe du fichier, puis le défaut."""
+    if sessions is None:
+        from cime.lanceur.surveillant import battement_frais
+        if battement_frais(Path(projet)):
+            inscrit = _plafond_machine_inscrit(projet)
+            if inscrit is not None:
+                return inscrit
+    return plafond.lire_machine()
+
+
+def _en_vigueur(projet, sessions) -> tuple[int, str]:
+    return plafond.en_vigueur(plafond_machine(projet, sessions)[0], plafond.plafond_projet(projet))
+
+
+def plafond_en_vigueur(projet) -> tuple[int, str]:
+    """(plafond, source) : le plus bas du plafond de la machine et de celui du projet."""
+    return _en_vigueur(projet, _sessions_vivantes())
+
+
 def charge_machine(projet) -> tuple[int | None, int, str | None]:
-    """(workers actifs, plafond `[charge] workers_max`, source du compte). Source : `"tmux"` quand
+    """(workers actifs, plafond en vigueur, source du compte). Source : `"tmux"` quand
     l'appelant voit tmux ; `"facteur"` quand le compte vient du fichier du facteur, qui bat ;
     None quand on ne sait pas (facteur arrêté, fichier absent ou illisible) — un compte inscrit
     par un facteur arrêté est périmé et ne sert pas."""
-    plafond = lire_manifeste(projet).workers_max
     sessions = _sessions_vivantes()
+    limite = _en_vigueur(projet, sessions)[0]
     if sessions is not None:
-        return compter_workers(sessions), plafond, "tmux"
+        return compter_workers(sessions), limite, "tmux"
     from cime.lanceur.surveillant import battement_frais
     actifs = _compte_inscrit(projet) if battement_frais(Path(projet)) else None
-    return actifs, plafond, ("facteur" if actifs is not None else None)
+    return actifs, limite, ("facteur" if actifs is not None else None)
 
 
 def plafond_atteint(projet) -> tuple[bool, int, int]:
     """(atteint, workers actifs sur la machine, plafond), d'après tmux : pour l'appelant qui le voit."""
-    actifs = compter_workers(_sessions_vivantes() or set())
-    plafond = lire_manifeste(projet).workers_max
-    return actifs >= plafond, actifs, plafond
+    sessions = _sessions_vivantes() or set()
+    actifs, limite = compter_workers(sessions), _en_vigueur(projet, sessions)[0]
+    return actifs >= limite, actifs, limite
 
 
 def _lancement_de_worker_en_file(projet, identifiant) -> bool:
@@ -396,7 +473,7 @@ def _retenu_par_le_plafond(projet, identifiant) -> bool:
     if not _lancement_de_worker_en_file(projet, identifiant):
         return False
     sessions = _sessions_vivantes()
-    return sessions is None or compter_workers(sessions) >= lire_manifeste(projet).workers_max
+    return sessions is None or compter_workers(sessions) >= _en_vigueur(projet, sessions)[0]
 
 
 def cibles_en_file(projet) -> list[str]:

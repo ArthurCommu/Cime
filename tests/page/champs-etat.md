@@ -188,3 +188,16 @@ Ce que la page fait de chaque champ de l'instantané d'état. Une ligne par cham
 | `fusions_auto.chantiers_24h` | affiché | récap : chantiers lancés sur les dernières 24 h |
 | `fusions_auto.chantiers_max` | affiché | récap : plafond de chantiers sur 24 h |
 | `fusions_auto.decisions` | affiché | récap « Depuis ta dernière visite » : ce que l'Assistant a décidé |
+| `charge` | affiché | ligne « Workers : A actifs sur P » du rail, du tiroir et de la feuille du téléphone ; `null` = mesure en échec, la ligne dit « inconnu » |
+| `charge.workers_max` | affiché | « … sur P » : le plafond en vigueur |
+| `charge.source` | affiché | dit si le plafond en vigueur vient du projet : le détail montre alors « Plafond du projet » |
+| `charge.machine` | affiché | détail dépliant : le plafond de la machine, qui le règle |
+| `charge.machine.valeur` | affiché | « Plafond de la machine : N », et la valeur choisie au départ dans le réglage |
+| `charge.machine.source` | affiché | « par défaut (3) » quand le plafond n'a jamais été réglé |
+| `charge.machine.depuis` | affiché | « modifié par … le <date> », seulement si connu |
+| `charge.machine.par` | affiché | « modifié par l'utilisateur » ou par un autre |
+| `charge.projet` | affiché | détail : « Plafond du projet », seulement s'il est plus bas que celui de la machine |
+| `charge.workers_actifs` | affiché | « A actifs » ; inconnu s'écrit « ? », jamais zéro |
+| `charge.par_projet` | affiché | détail : « Par projet : nom n · nom n » |
+| `charge.par_projet.blog` | écarté | clé de l'exemple : les noms de projets ne sont pas fixes, la page les lit tous |
+| `charge.par_projet.boutique` | écarté | clé de l'exemple : les noms de projets ne sont pas fixes, la page les lit tous |

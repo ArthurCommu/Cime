@@ -58,8 +58,9 @@ class Manifeste:
     sites: list[str] = field(default_factory=list)
     # contrats que le projet suit : `[contrats] <nom> = ["<équipe lectrice>", …]`, optionnel
     contrats: dict[str, list[str]] = field(default_factory=dict)
-    # workers actifs en même temps sur la machine : `[charge] workers_max`, optionnel, au moins 1
-    workers_max: int = 1
+    # plus bas plafond de workers actifs pour ce projet : `[charge] workers_max`, optionnel, au moins
+    # 1 ; absent = pas de limite de projet (le plafond de la machine s'applique seul)
+    workers_max: int | None = None
     # minutes de repos après lesquelles un coordinateur sans dette est fermé : `[charge]
     # coordinateur_repos_minutes`, optionnel, 0 = jamais
     coordinateur_repos_minutes: int = 20
@@ -96,8 +97,11 @@ def _table_charge(donnees: dict, fichier: Path) -> dict:
     return table
 
 
-def _workers_max(donnees: dict, fichier: Path) -> int:
-    valeur = _table_charge(donnees, fichier).get("workers_max", 1)
+def _workers_max(donnees: dict, fichier: Path) -> int | None:
+    table = _table_charge(donnees, fichier)
+    if "workers_max" not in table:
+        return None
+    valeur = table["workers_max"]
     if isinstance(valeur, bool) or not isinstance(valeur, int) or valeur < 1:
         raise ErreurProjet(
             f"charge.workers_max doit être un entier au moins égal à 1 ({fichier})")

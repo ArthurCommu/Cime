@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from starlette.routing import Route
 
-from . import actions_autorisation, actions_cloture, actions_fusions_auto, actions_reponses
+from . import actions_autorisation, actions_cloture, actions_fusions_auto, actions_plafond, actions_reponses
 
 
 def routes(contexte) -> list[Route]:
@@ -12,4 +12,5 @@ def routes(contexte) -> list[Route]:
         + actions_cloture.routes(contexte)
         + actions_reponses.routes(contexte)
         + actions_fusions_auto.routes(contexte)
+        + actions_plafond.routes(contexte)
     )

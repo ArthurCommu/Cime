@@ -955,6 +955,43 @@ export async function basculerMode(valeur) {
   retrouverFocusMode();
 }
 
+// ---------------------------------------------------------------------------
+// Le plafond de workers de la machine : une prérogative de l'utilisateur, exécutée sans confirmation (le réglage est réversible)
+// ---------------------------------------------------------------------------
+/** Le message de l'hôte reste affiché ce temps, puis disparaît. */
+export const RETOUR_PLAFOND_MS = 8_000;
+let plafondEnCours = null; // la valeur envoyée ('1'..'8' ou 'defaut') tant que l'hôte n'a pas répondu
+let plafondRetour = null; // { resultat, message, valeur } : la dernière réponse de l'hôte
+let plafondMinuteur = null;
+
+export const plafondDemande = () => plafondEnCours;
+export const retourPlafond = () => plafondRetour;
+
+/** Règle le plafond : un entier de 1 à 8 ou « defaut ». La réponse de l'hôte (ok, déjà, refus, erreur) est gardée pour être écrite près du choix. */
+export async function reglerPlafond(valeur) {
+  if (plafondEnCours || actionsFigees) return;
+  const avaitLeFocus = Boolean(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('plafond-choix'));
+  clearTimeout(plafondMinuteur);
+  plafondRetour = null;
+  plafondEnCours = String(valeur);
+  rerendre();
+  const corps = { valeur: valeur === 'defaut' ? 'defaut' : Number(valeur) };
+  let reponse;
+  try {
+    reponse = await source.agir('plafond', corps, { cible: 'machine', details: { valeur: corps.valeur } });
+  } catch (e) {
+    reponse = { resultat: 'erreur', message: e.message };
+  }
+  plafondEnCours = null;
+  plafondRetour = { resultat: reponse.resultat, message: reponse.message || '', valeur: String(valeur) };
+  plafondMinuteur = setTimeout(() => { plafondRetour = null; rerendre(); }, RETOUR_PLAFOND_MS);
+  rerendre();
+  if (avaitLeFocus) {
+    const choix = [...document.querySelectorAll('.plafond-choix')];
+    if (choix.length) choix[choix.length - 1].focus();
+  }
+}
+
 /** Le rail se redessine : l'interrupteur touché y est un nouvel élément, le clavier doit le retrouver (sauf s'il est allé ailleurs entre-temps). */
 function retrouverFocusMode() {
   const actif = document.activeElement;

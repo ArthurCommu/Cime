@@ -40,6 +40,7 @@ const ROUTES_ACTIONS = {
   cloturer: '/api/actions/cloturer',
   demander: '/api/actions/demander',
   fusions_auto: '/api/actions/fusions-auto',
+  plafond: '/api/actions/plafond',
 };
 
 const RESULTATS = new Set(['ok', 'refuse', 'erreur']);

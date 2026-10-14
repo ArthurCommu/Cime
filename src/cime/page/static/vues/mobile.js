@@ -7,6 +7,7 @@
 import { el, icone, feuille, pluriel, attentesOuvertes, carteAttente, resumeAgents, PAGES } from '../commun.js';
 import { trierAttentes } from './rail.js';
 import { interrupteurMode, encadreMode } from './mode-autonome.js';
+import { ligneWorkers } from './workers.js';
 
 /** La largeur en deçà de laquelle l'écran est un téléphone : la même que dans style.css. */
 export const POINT_DE_RUPTURE = 760;
@@ -47,6 +48,7 @@ function contenuAttentes(etat) {
     modeDansLaFeuille(etat) ? el('div', { class: 'feuille-mode' }, interrupteurMode(etat)) : null, // première ligne : la tête reste titre + « Fermer »
     el('div', { class: 'feuille-effectifs' }, resumeAgents(etat)),
     modeDansLaFeuille(etat) ? encadreMode(etat, () => majFeuilleAttentes(dernierEtat)) : null,
+    modeDansLaFeuille(etat) ? ligneWorkers(etat, () => majFeuilleAttentes(dernierEtat)) : null,
     attentes === null
       ? el('div', { class: 'inconnu-bloc' }, 'Ce qui t’attend : inconnu (sources en échec).')
       : attentes.length

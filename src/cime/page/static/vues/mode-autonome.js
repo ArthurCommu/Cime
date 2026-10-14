@@ -10,6 +10,7 @@ import {
   LIBELLE_DETAIL_RECAP,
 } from '../autonome.js';
 import { detailDecisions, etatDecisions } from './decisions.js';
+import { ligneWorkers } from './workers.js';
 
 let listeDepliee = false; // « Restent à toi : … » est dépliée
 const themesEnEntier = new Set(); // les thèmes dont l'utilisateur a demandé tous les chemins
@@ -133,6 +134,8 @@ export function encadreMode(etat, redessiner) {
 
 /** Le bloc du tiroir du téléphone quand rien n'attend : l'interrupteur en première ligne, puis l'encadré. */
 export function blocTiroirMode(etat, redessiner) {
-  return el('section', { class: 'bloc-rail bloc-mode', 'aria-label': LIBELLE_MODE },
+  const bloc = el('section', { class: 'bloc-rail bloc-mode', 'aria-label': LIBELLE_MODE },
     el('div', { class: 'rail-tete' }, interrupteurMode(etat)), encadreMode(etat, redessiner));
+  bloc.append(ligneWorkers(etat, redessiner));
+  return bloc;
 }

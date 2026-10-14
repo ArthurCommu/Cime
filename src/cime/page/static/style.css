@@ -354,6 +354,29 @@ button.chemins-suite:hover { color: var(--bleu-clair); }
 }
 .etat-auto .action:disabled { opacity: 0.6; cursor: progress; }
 
+/* ---------- Les workers : une ligne sobre sous le mode autonome, qui se déplie sur le plafond de la machine et son réglage ---------- */
+.workers { font-size: 12px; line-height: 1.5; color: var(--secondaire); }
+.workers-ligne {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 0; background: none; border: 0; border-radius: var(--rayon-petit);
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.workers-ligne:hover { color: var(--texte-doux); }
+.workers-fleche { font-size: 10px; color: var(--discret); }
+.workers-detail { display: flex; flex-direction: column; gap: 4px; padding: 4px 0 4px 8px; border-left: 1px solid var(--bord); }
+.workers-detail p { margin: 0; }
+.plafond-reglage { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.plafond-choix {
+  min-height: 32px; padding: 0 8px; border: 1px solid var(--bord); border-radius: var(--rayon-petit); background: var(--champ); color: var(--texte);
+  font: 500 12px var(--police);
+}
+.plafond-choix:disabled { opacity: 0.6; cursor: progress; }
+.plafond-retour { color: var(--secondaire); }
+.plafond-retour.plafond-erreur { color: var(--rouge-clair); }
+@media (pointer: coarse), (max-width: 760px) {
+  .workers-ligne, .plafond-reglage, .plafond-choix { min-height: 44px; }
+  .plafond-choix { font-size: 16px; }
+}
+
 /* ---------- L'hôte ne répond pas au chargement ---------- */
 .injoignable { min-height: calc(100vh - 56px); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .injoignable-carte {

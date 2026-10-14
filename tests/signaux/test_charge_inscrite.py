@@ -48,7 +48,7 @@ def test_l_ecriture_est_atomique(projet, tmux, monkeypatch):
         ordres.inscrire_charge(projet)
     assert len(vus) == 1
     source, cible, contenu = vus[0]
-    assert source != cible and contenu == {"workers_actifs": 0}     # complet avant le remplacement
+    assert source != cible and contenu["workers_actifs"] == 0       # complet avant le remplacement
     assert compte_inscrit(projet) == 1                              # l'ancien reste lisible
 
 

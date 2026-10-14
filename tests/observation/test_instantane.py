@@ -15,6 +15,7 @@ from chrono import meilleur
 
 from cime.observation import git, instantane, tmux, transcripts
 from cime.observation.instantane import _titre_tache
+from cime.signaux import livraison
 from test_registre import MAINTENANT, Base, hook, iso
 
 CAPTURES = Path(__file__).parent / "fixtures" / "captures"
@@ -66,8 +67,12 @@ class Faux:
         self.git = None
         monkeypatch.setattr(tmux, "lister_sessions", self.lister_sessions)
         monkeypatch.setattr(tmux, "lire_invites", self.lire_invites)
+        monkeypatch.setattr(livraison, "sonde_sessions", self.sonde_sessions)
         monkeypatch.setattr(git, "lire_git", self.lire_git)
         monkeypatch.setattr(transcripts, "trouver_transcript", lambda *a, **k: None)
+
+    def sonde_sessions(self):
+        return set(self.sessions) if self.tmux_ok else None
 
     def lister_sessions(self, prefixe):
         if not self.tmux_ok:
@@ -376,7 +381,7 @@ def test_manifeste_absent_instantane_quand_meme(tmp_path, faux):
     assert d["projet"] is None and d["equipes"] is None
     noms = {s["nom"]: s["ok"] for s in d["sources"]}
     assert noms == {"structure": False, "registre": False, "transcripts": False, "tmux": False,
-                    "git": False, "tarifs": True}
+                    "git": False, "tarifs": True, "charge": True}
     assert json.dumps(d)
 
 
@@ -384,7 +389,7 @@ def test_manifeste_absent_instantane_quand_meme(tmp_path, faux):
 
 CLES = {
     "racine": {"version", "genere_a", "duree_collecte_ms", "projet", "sources", "agents", "equipes",
-               "fil", "attentes_utilisateur", "flux", "aretes", "ordres", "facteur", "alarmes", "fusions_auto",
+               "fil", "attentes_utilisateur", "flux", "aretes", "ordres", "facteur", "charge", "alarmes", "fusions_auto",
                "consommation", "sessions_hors_organigramme", "decisions_recentes"},
     "projet": {"nom", "racine", "prefixe", "branche_reference", "etapes"},
     "agent": {"id", "role", "equipe", "parent", "session_tmux", "vivant", "etat", "etat_depuis",
@@ -426,7 +431,7 @@ def test_json_et_toutes_les_cles(base, faux):
     assert set(d) == CLES["racine"] and set(d["projet"]) == CLES["projet"]
     assert d["projet"]["etapes"] == [{"nom": "Cadrage", "atteinte": True, "date": "2026-10-07"},
                                      {"nom": "Page", "atteinte": False, "date": None}]
-    assert [s["nom"] for s in d["sources"]] == ["structure", "registre", "transcripts", "tmux", "git", "tarifs"]
+    assert [s["nom"] for s in d["sources"]] == ["structure", "registre", "transcripts", "tmux", "git", "tarifs", "charge"]
     for a in d["agents"]:
         assert set(a) == CLES["agent"] and a["etat"] in ETATS
         assert a["etat_source"] or (a["id"] == "utilisateur" and a["etat_source"] is None)

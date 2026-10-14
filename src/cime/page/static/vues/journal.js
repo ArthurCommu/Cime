@@ -13,6 +13,7 @@ const ACTIONS = {
   cloturer: 'équipe clôturée',
   lu: 'compte rendu lu',
   fusions_auto: 'mode autonome',
+  plafond: 'plafond de workers',
 };
 
 /** Refuser un accord (ses détails portent l’objet) n’est pas refuser une autorisation (agent, outil). */

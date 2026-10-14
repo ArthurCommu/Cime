@@ -158,6 +158,28 @@ def _parser() -> argparse.ArgumentParser:
                    help="sans argument : état et liste des chemins réservés ; avec : réservé à l'utilisateur")
 
     s = sub.add_parser(
+        "plafond",
+        help="le plafond de workers actifs de la machine : le lire, ou (utilisateur) le régler",
+        description="Le plafond est un réglage de la machine, valable pour tous les projets "
+                    "(fichier personnel `cime/reglages.toml` du dossier de configuration) ; un "
+                    "projet peut fixer un plafond plus bas dans son manifeste (`[charge] "
+                    "workers_max`), jamais plus haut. Sans argument : le plafond en vigueur (le "
+                    "plus bas des deux), celui de la machine, celui du projet et les workers "
+                    "actifs de tous les projets, projet par projet. `plafond N` (1 à 8) ou "
+                    "`plafond --defaut` (revenir au défaut, 3) : réservé à l'utilisateur, il "
+                    "n'a pas besoin d'un projet. Baisser le plafond au-dessous du nombre de "
+                    "workers actifs ne tue aucun worker : les nouveaux lancements attendent "
+                    "qu'une place se libère. Limite connue : les workers se comptent par les "
+                    "sessions tmux dont le nom contient `-worker-`, tous préfixes confondus ; "
+                    "un worker lancé hors de tmux n'est pas vu, et une session étrangère "
+                    "nommée `…-worker-…` est comptée à tort.")
+    g = s.add_mutually_exclusive_group()
+    g.add_argument("valeur", nargs="?", help="le nouveau plafond, un entier de 1 à 8")
+    g.add_argument("--defaut", action="store_true", help="revenir au plafond par défaut (3)")
+    s.add_argument("--json", dest="sortie_json", action="store_true",
+                   help="sans argument : l'état en JSON")
+
+    s = sub.add_parser(
         "fermer",
         help="fermer un projet : noter ses conversations, fermer ses sessions et son hôte "
              "(utilisateur seulement)")

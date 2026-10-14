@@ -129,6 +129,28 @@ def test_fusions_auto_forme_substituee():
             g.autoriser_commande([sys.executable, "faux.py", *reste])
 
 
+PLAFOND_OK = [["1"], ["8"], ["--defaut"]]
+PLAFOND_KO = [[], ["0"], ["9"], ["+3"], ["03"], ["３"], ["3.0"], [""], ["3", "4"], ["--defaut", "3"],
+              ["--json"], ["3", "--defaut"], [" 3"], ["3 "], ["-1"], ["10"]]
+
+
+@pytest.mark.parametrize("reste", PLAFOND_OK, ids=str)
+def test_plafond_accepte(reste):
+    G.autoriser_commande(["cime", "plafond", *reste])
+    g = Gardes("cc-essai", envoyer=[sys.executable, "faux.py"])
+    g.autoriser_commande([sys.executable, "faux.py", "plafond", *reste])
+
+
+@pytest.mark.parametrize("reste", PLAFOND_KO, ids=str)
+def test_plafond_refuse(reste):
+    with pytest.raises(Interdit):
+        G.autoriser_commande(["cime", "plafond", *reste])
+    g = Gardes("cc-essai", envoyer=[sys.executable, "faux.py"])
+    assert g.plafond is None
+    with pytest.raises(Interdit):
+        g.autoriser_commande([sys.executable, "faux.py", "plafond", *reste])
+
+
 def test_executer_refuse_avant_de_lancer():
     with pytest.raises(Interdit):
         G.executer(["git", "push"])
@@ -318,7 +340,7 @@ def test_inventaire_des_routes(tmp_path):
         ("POST", "/api/permissions"),
     } | {("POST", f"/api/actions/{a}") for a in
          ("autoriser", "refuser", "accorder", "cloturer", "trancher", "deposer", "lu", "demander",
-          "fusions-auto")}
+          "fusions-auto", "plafond")}
     assert trouvees == attendues
 
 

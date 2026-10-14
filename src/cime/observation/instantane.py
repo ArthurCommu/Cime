@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-from . import alarmes, git, registre, structure, tmux, transcripts
+from . import alarmes, charge, git, registre, structure, tmux, transcripts
 
 VERSION = 2
 _TITRE_TACHE = re.compile(r"^#\s*Tâche\s*:\s*(.+?)\s*$")
@@ -84,6 +84,7 @@ def instantane(projet: Path, maintenant: datetime | None = None, *, complet: boo
         f_reg = pool.submit(registre.lire_registre, racine, maintenant)
         f_tmux = pool.submit(tmux.lister_sessions, prefixe) if prefixe else None
         f_eq = pool.submit(structure.lire_equipes, racine, proj) if proj else None
+        f_charge = pool.submit(charge.lire_charge, racine)
         equipes_l, src_equipes = f_eq.result() if f_eq else (None, _echec("equipes", "manifeste en échec"))
         f_git = None
         if proj and equipes_l is not None:
@@ -92,6 +93,10 @@ def instantane(projet: Path, maintenant: datetime | None = None, *, complet: boo
         brouillons, src_invites = None, None
         if sessions is not None:
             f_brouillons = pool.submit(tmux.lire_invites, list(sessions), prefixe)
+        try:
+            bloc_charge, src_charge = f_charge.result()
+        except Exception as e:  # noqa: BLE001 — une collecte qui lève reste une source en échec
+            bloc_charge, src_charge = None, _echec("charge", str(e) or type(e).__name__)
         reg, src_registre = f_reg.result()
         if reg is not None:  # l'émetteur `cime` n'est pas un agent
             reg["agents"] = {a: r for a, r in reg["agents"].items() if a != "cime"}
@@ -353,7 +358,7 @@ def instantane(projet: Path, maintenant: datetime | None = None, *, complet: boo
         "projet": None if proj is None else {
             "nom": proj["nom"], "racine": proj["racine"], "prefixe": proj["prefixe"],
             "branche_reference": proj["branche_reference"], "etapes": proj["etapes"]},
-        "sources": [src_structure, src_registre, src_transcripts, src_tmux_g, src_git, src_tarifs],
+        "sources": [src_structure, src_registre, src_transcripts, src_tmux_g, src_git, src_tarifs, src_charge],
         "agents": agents,
         "equipes": equipes if equipes_l is not None else None,
         "fil": fil,
@@ -362,6 +367,7 @@ def instantane(projet: Path, maintenant: datetime | None = None, *, complet: boo
         "aretes": reg["aretes"] if reg is not None else None,
         "ordres": ordres,
         "facteur": reg["facteur"] if reg is not None else None,
+        "charge": bloc_charge,
         "alarmes": liste_alarmes,
         "fusions_auto": _fusions_auto(racine, maintenant),
         "consommation": _consommation_projet(agents),
