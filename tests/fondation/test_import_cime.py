@@ -130,14 +130,20 @@ def signalements(conn):
                         " AND objet LIKE 'import-cime:%' ORDER BY id").fetchall()
 
 
+PY = {"tool_input": {"command": "python -c 'import cime'"}}
 ERREUR = "Traceback (most recent call last):\nModuleNotFoundError: No module named 'cime'\n"
 
 
 @pytest.mark.parametrize("entree", [
-    {"tool_name": "Bash", "tool_response": {"stdout": "", "stderr": ERREUR}},
-    {"tool_name": "Bash", "tool_response": ERREUR},
-    {"tool_name": "Bash", "error": f"Exit code 1\n{ERREUR}"},
-    {"tool_name": "Bash", "tool_response": {"stderr": "ImportError: cannot import name 'x' from 'cime.y'"}},
+    {"tool_name": "Bash", **PY, "tool_response": {"stdout": "", "stderr": ERREUR}},
+    {"tool_name": "Bash", **PY, "tool_response": ERREUR},
+    {"tool_name": "Bash", **PY, "error": f"Exit code 1\n{ERREUR}"},
+    # le paquet lui-même illisible sous le bac à sable (dossier ou `cime/__init__.py`)
+    {"tool_name": "Bash", **PY, "tool_response": {"stderr": "PermissionError: [Errno 1] Operation not "
+                                                      "permitted: '/opt/x/src/cime/__init__.py'"}},
+    {"tool_name": "Bash", **PY, "error": "PermissionError: [Errno 1] Operation not permitted: '/opt/x/src/cime'"},
+    {"tool_name": "Bash", **PY, "tool_response": {"stderr": "ImportError: [Errno 1] Operation not permitted: "
+                                                      "'/opt/x/src/cime/__init__.py'"}},
 ])
 def test_echec_d_import_inscrit_un_signalement_par_destinataire(registre, entree):
     racine, conn = registre
@@ -151,7 +157,7 @@ def test_echec_d_import_inscrit_un_signalement_par_destinataire(registre, entree
 
 def test_meme_erreur_repetee_pas_de_second_signalement(registre):
     racine, conn = registre
-    entree = {"tool_name": "Bash", "tool_response": {"stderr": ERREUR}}
+    entree = {"tool_name": "Bash", **PY, "tool_response": {"stderr": ERREUR}}
     hooks.sur_import_cime_manquant(conn, racine, "coord-essai", entree)
     assert hooks.sur_import_cime_manquant(conn, racine, "coord-essai", entree) == []
     assert len(signalements(conn)) == 2
@@ -162,7 +168,7 @@ def test_meme_erreur_repetee_pas_de_second_signalement(registre):
 
 def test_au_dela_d_une_heure_un_nouveau_signalement(registre):
     racine, conn = registre
-    entree = {"tool_name": "Bash", "tool_response": {"stderr": ERREUR}}
+    entree = {"tool_name": "Bash", **PY, "tool_response": {"stderr": ERREUR}}
     hooks.sur_import_cime_manquant(conn, racine, "coord-essai", entree)
     with conn:
         conn.execute("UPDATE messages SET horodatage = '2020-01-01T00:00:00.000Z'")
@@ -171,16 +177,127 @@ def test_au_dela_d_une_heure_un_nouveau_signalement(registre):
 
 
 @pytest.mark.parametrize("entree", [
-    {"tool_name": "Bash", "tool_response": {"stdout": "ok", "stderr": ""}},
-    {"tool_name": "Bash", "tool_response": {"stderr": "ModuleNotFoundError: No module named 'requests'"}},
-    {"tool_name": "Bash", "tool_response": {"stderr": "ModuleNotFoundError: No module named 'cimex'"}},
-    {"tool_name": "Bash", "tool_response": {"stdout": "j'aime le cime"}},
-    {"tool_name": "Read"},
+    {"tool_name": "Bash", **PY, "tool_response": {"stdout": "ok", "stderr": ""}},
+    {"tool_name": "Bash", **PY, "tool_response": {"stderr": "ModuleNotFoundError: No module named 'requests'"}},
+    {"tool_name": "Bash", **PY, "tool_response": {"stderr": "ModuleNotFoundError: No module named 'cimex'"}},
+    {"tool_name": "Bash", **PY, "tool_response": {"stdout": "j'aime le cime"}},
+    {"tool_name": "Read", **PY},
+    # un test rouge écrit avant son module : pas une panne d'installation
+    {"tool_name": "Bash", **PY, "tool_response": {"stderr": "ImportError: cannot import name 'x' from 'cime.y'"}},
+    {"tool_name": "Bash", **PY, "tool_response": {"stdout": "E   ImportError: cannot import name 'plafond' "
+                                                      "from 'cime.fondation' (/opt/x/src/cime/fondation/"
+                                                      "__init__.py)"}},
+    {"tool_name": "Bash", **PY, "tool_response": {"stdout": "E   ImportError: cannot import name 'y' from "
+                                                      "'cime' (/opt/x/src/cime/__init__.py)"}},
+    {"tool_name": "Bash", **PY, "tool_response": {"stdout": "ModuleNotFoundError: No module named 'cime.nouveau'"}},
+    {"tool_name": "Bash", **PY, "tool_response": {"stdout": "ModuleNotFoundError: No module named "
+                                                      "'cime.fondation.nouveau'"}},
+    {"tool_name": "Bash", **PY, "error": "PermissionError: [Errno 1] Operation not permitted: "
+                                   "'/opt/x/src/cime/fondation/x.py'"},
 ])
 def test_sortie_ordinaire_ou_autre_paquet_rien(registre, entree):
     racine, conn = registre
     assert hooks.sur_import_cime_manquant(conn, racine, "coord-essai", entree) == []
     assert signalements(conn) == []
+
+
+# --- 4. seule la sortie d'un programme Python compte --------------------------------------
+
+def avec(commande, sortie=ERREUR, outil="Bash"):
+    entree = {"tool_name": outil, "tool_response": {"stdout": sortie}}
+    if commande is not None:
+        entree["tool_input"] = {"command": commande}
+    return entree
+
+
+@pytest.mark.parametrize("commande", [
+    "python -c \"import cime\"",
+    ".venv/bin/python -m pytest tests/x -k y",
+    "uv run python x.py",
+    "uv tool run pytest",
+    "uvx pytest",
+    "cd d && python3 x.py",
+    "PYTHONPATH=x python3 -m cime reprise",
+    "env X=1 pytest",
+    "/usr/bin/python3 x.py 2>&1 | tail -5",
+    "ls; time nice -n 5 python x.py",
+    "cd d && (exec .venv/bin/python3.12 x.py)",
+    "false || coverage run x.py",
+    "pip install -e .",
+    "pipx run x",
+    "py.test -q",
+    "nohup command pytest",
+])
+def test_une_commande_python_alerte(registre, commande):
+    racine, conn = registre
+    assert len(hooks.sur_import_cime_manquant(conn, racine, "coord-essai", avec(commande))) == 2
+
+
+@pytest.mark.parametrize("commande", [
+    "cat fichier", "sed -n 1,5p f", "grep -n x f", "echo \"python x\"", "git log", "ls -la",
+    "printf 'python' | head", "find . -name python", "awk '{print}' f", "rg python", "tail -3 f",
+    "cd python && cat f", "X=python cat f", "cat python", "less pytest.ini", "git -C pytest log",
+    "", None, 'echo "non fermé', {"pas": "une chaîne"},
+])
+def test_une_commande_qui_n_est_pas_python_n_alerte_pas(registre, commande):
+    racine, conn = registre
+    assert hooks.sur_import_cime_manquant(conn, racine, "coord-essai", avec(commande)) == []
+    assert signalements(conn) == []
+
+
+@pytest.mark.parametrize("outil", ["Read", "Grep", "Glob", "Edit", "Task"])
+def test_un_autre_outil_qu_un_bash_n_alerte_pas(registre, outil):
+    racine, conn = registre
+    assert hooks.sur_import_cime_manquant(
+        conn, racine, "coord-essai", avec("python x.py", outil=outil)) == []
+
+
+def test_commande_absente_ou_entree_illisible_n_alerte_pas(registre):
+    racine, conn = registre
+    for entree in (avec(None), {"tool_name": "Bash", "tool_input": None, "tool_response": ERREUR},
+                   {"tool_name": "Bash", "tool_input": "python x", "tool_response": ERREUR}):
+        assert hooks.sur_import_cime_manquant(conn, racine, "coord-essai", entree) == []
+
+
+MESSAGE_CITE = "Reçu de l'Assistant : « l'import a levé No module named 'cime' hier »\n"
+PANNE_CIME = "Traceback (most recent call last):\n  File \"/x/bin/cime\", line 3\n" \
+             "ModuleNotFoundError: No module named 'cime'\n"
+
+
+def test_cime_qui_affiche_un_message_cite_n_alerte_pas(registre):
+    racine, conn = registre
+    assert hooks.sur_import_cime_manquant(
+        conn, racine, "coord-essai", avec("cime reprise", MESSAGE_CITE)) == []
+
+
+def test_cime_qui_ne_s_importe_pas_alerte(registre):
+    racine, conn = registre
+    assert len(hooks.sur_import_cime_manquant(
+        conn, racine, "coord-essai", avec("cime reprise", PANNE_CIME))) == 2
+
+
+def test_cime_dans_un_pipe_qui_affiche_un_message_cite_n_alerte_pas(registre):
+    racine, conn = registre
+    assert hooks.sur_import_cime_manquant(
+        conn, racine, "coord-essai", avec("cime reprise | cat", MESSAGE_CITE)) == []
+
+
+@pytest.fixture
+def garde_cassee(monkeypatch):
+    import sys
+    from cime.fondation import garde  # noqa: F401  (chargé avant d'être masqué)
+    monkeypatch.setitem(sys.modules, "cime.fondation.garde", None)  # `import` lève ImportError
+
+
+def test_garde_non_importable_l_alerte_fonctionne_sur_la_commande_brute(registre, garde_cassee):
+    racine, conn = registre
+    assert len(hooks.sur_import_cime_manquant(
+        conn, racine, "coord-essai", avec("cd d && python3 x.py"))) == 2
+
+
+def test_garde_non_importable_une_commande_non_python_n_alerte_pas(registre, garde_cassee):
+    racine, conn = registre
+    assert hooks.sur_import_cime_manquant(conn, racine, "coord-essai", avec("cat f")) == []
 
 
 @pytest.mark.parametrize("evenement", ["PostToolUse", "PostToolUseFailure"])
@@ -189,7 +306,7 @@ def test_le_hook_cable_les_deux_evenements(registre, monkeypatch, evenement):
     from cime.fondation import hook
     racine, conn = registre
     monkeypatch.setenv(VAR_AGENT, "coord-essai")
-    entree = {"tool_name": "Bash", "error": ERREUR, "tool_response": {"stderr": ERREUR}}
+    entree = {"tool_name": "Bash", **PY, "error": ERREUR, "tool_response": {"stderr": ERREUR}}
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(entree)))
     assert hook.executer(argparse.Namespace(evenement=evenement)) == 0
     assert len(signalements(conn)) == 2

@@ -1,0 +1,176 @@
+"""Corpus de commandes pour les tests de la garde : actions interdites dans toutes leurs
+enveloppes, et texte qui en parle sans les exécuter. Rien n'y touche hors d'un dossier
+temporaire : ni suppression, ni réseau.
+"""
+from pathlib import Path
+
+
+# Scripts posés dans le dossier de travail, que les commandes du corpus lancent.
+SCRIPTS = {
+    "s_push.sh": "#!/bin/sh\n# l'export ne fait ni push ni tmux, d'après l'utilisateur\ngit push\n",
+    "s_tmux.sh": "#!/bin/bash\n# Ni push ici\ntmux ls\n",
+    "exporter-depot-public.sh": ("#!/bin/bash\n# Exporte le dépôt public. Ni push, ni tmux : l'utilisateur\n"
+                                 "# pousse lui-même (git push reste à lui).\nset -e\necho export\n"),
+}
+
+
+def poser_scripts(dossier: Path) -> None:
+    """Écrit les scripts du corpus dans `dossier`, exécutables."""
+    for nom, texte in SCRIPTS.items():
+        p = Path(dossier) / nom
+        p.write_text(texte)
+        p.chmod(0o755)
+
+
+# --- corpus écrit à la main --------------------------------------------------------------
+
+# Actions interdites, dans toutes les enveloppes : un vrai shell les exécute (vérifié par l'oracle).
+REFUSEES = [
+    "git push",
+    "ls; git push",
+    "true && git push origin main",
+    "false || git push",
+    "echo x | git push",
+    "echo $(git push)",
+    "echo `git push`",
+    "( git push )",
+    "{ git push; }",
+    "bash -c 'git push'",
+    "sh -c \"git push\"",
+    "zsh -c 'git push'",
+    "bash <<EOF\ngit push\nEOF",
+    "sh <<'EOF'\n# l'export d'Eugène\ngit push\nEOF",
+    "cat <<EOF | sh\ngit push\nEOF",
+    "bash -s <<'EOF'\n# rien d'autre\ngit push\nEOF",
+    "bash s_push.sh",
+    "sh s_push.sh",
+    "./s_push.sh",
+    "./s_tmux.sh",
+    "command git push",
+    "env git push",
+    "\\git push",
+    "git -C . push",
+    "git --no-pager push",
+    "g=git; $g push",
+    "g=git; \"$g\" push",
+    "g=git\n$g push",
+    "G='git push'\n$G",
+    "p=push; git $p",
+    "shopt -s expand_aliases 2>/dev/null\nalias gp='git push'\ngp",
+    "shopt -s expand_aliases 2>/dev/null\nalias g=git\ng push",
+    "$(echo git) push",
+    "python3 -c 'import subprocess; subprocess.run([\"git\", \"push\"])'",
+    "python3 -c 'import os; os.system(\"tmux ls\")'",
+    "python3 - <<'EOF'\n# l'export\nimport subprocess\nsubprocess.run([\"git\", \"push\"])\nEOF",
+    "perl -e 'system(\"git push\")'",
+    "perl <<'EOF'\n# l'export\nsystem(\"tmux ls\");\nEOF",
+    "# l'export\ngit push",
+    "# l'export d'Eugène\n# d'autres\ngit push",
+    "echo hi # l'export\ngit push",
+    "echo $'a\\' # '; git push",
+    "echo \"x\" #c\ngit push",
+    "echo \"'\" # x\ngit push",
+    "a=# ; git push",
+    "echo $(echo \"x # y\"); git push",
+    "echo a#b; git push",
+    "# x \\\ngit push",
+    "echo a\\\n#b; git push",
+    "echo \"<<EOF\"\ngit push\nEOF",
+    "# <<EOF\ngit push\nEOF",
+    "echo $'\\'' ; git push ; echo '\n'\n'",
+    "git \\\n  push",
+    "tmux ls",
+    "ls && tmux ls",
+    "echo $(tmux ls)",
+    "bash -c 'tmux ls'",
+    "sh <<'EOF'\n# l'export\ntmux ls\nEOF",
+    "security find-generic-password -s x",
+    "true; security dump-keychain",
+    "sh -c 'security find-generic-password'",
+    "bash <<'EOF'\nsecurity x\nEOF",
+    "rtk proxy ls",
+    "ls | rtk proxy ls",
+    "bash -c 'rtk proxy ls'",
+    "git branch -D x",
+    "git branch -d x",
+    "git branch --delete x",
+    "ls; git branch -D x",
+    "bash -c 'git branch -D x'",
+    "sh <<'EOF'\n# l'export\ngit branch --delete x\nEOF",
+    "echo \"it's\" # l'export\ngit push",
+    "x=1 $(cat <<'EOF'\ngit push\nEOF\n)",
+    "command $(cat <<'EOF'\ngit push\nEOF\n)",
+    "`cat <<'EOF'\ngit push\nEOF\n`",
+    "cat <<EOF # it's\ncorps\nEOF\ngit push",
+    "echo a;# l'export\ngit push",
+    "echo a|# l'export\ncat; git push",
+    "bash -c $'\\x67it push'",
+    "cat <<EOF |\ngit push\nEOF\nsh",
+    "{ cat <<EOF\ngit push\nEOF\n} | sh",
+    "echo ${x:-'}'} ; git push",
+    "echo ${x#*#} # c\ngit push",
+    "case a in a) echo # c\ngit push ;; esac",
+    "a=1 # c \\\ngit push",
+    "echo 'a\n# b' ; git push",
+    "ls (#i)x; git push",
+    "ls (#i)x; git push\ncase a in a) ;; esac",
+    "bash <<'EOF'\ng=git\n$g push\nEOF",
+    "sh -s <<'EOF'\nalias gp='git push'\ngp\nEOF",
+    "eval \"$(cat <<'EOF'\ngit push\nEOF\n)\"",
+    "python3 - <<'EOF'\ns = \"it's # pas un commentaire\"; import os; os.system(\"tmux ls\")\nEOF",
+]
+
+# Refusées par prudence sans qu'un shell les exécute forcément (alias défini sur la même ligne…).
+REFUSEES_PRUDENCE = [
+    "alias g=git; g push",
+    "echo 'git push",
+]
+
+# Du texte qui parle d'actions interdites sans les exécuter : la garde laisse passer.
+TEXTES = [
+    "echo hi # l'export d'Eugène\nls",
+    "git status\n# l'export\n" + "echo ligne\n" * 30 + "# Ni push ici",
+    "git log --oneline -3\n# l'export ne fait pas de git push, d'après l'utilisateur",
+    "# tmux est fermé, git push aussi\nls",
+    "cime envoyer --a coord-x --corps 'pas de tmux ni de git push ici' 'résumé'",
+    "cime envoyer --a coord-x --corps \"l'export ne lance ni tmux ni security\" 'résumé'",
+    "cat <<EOF\ngit push\ntmux ls\nsecurity x\nEOF",
+    "cat <<'EOF'\ngit push\n# l'export\nrtk proxy ls\nEOF",
+    "cat > note.txt <<'EOF'\ngit push\ntmux\nsecurity\nEOF",
+    "cat > deploy.sh <<'EOF'\n#!/bin/sh\ngit push\nEOF",
+    "tee note.txt <<'EOF' >/dev/null\nl'export puis git push\nEOF",
+    "python3 - <<'EOF'\n# git push et tmux, d'après l'utilisateur\nprint(1)\nEOF",
+    "python3 - <<'EOF'\nx = 1  # pas de git push ni de tmux\nprint(x)\nEOF",
+    "bash exporter-depot-public.sh",
+    "sh exporter-depot-public.sh",
+    "./exporter-depot-public.sh",
+    "echo 'git push'",
+    "echo \"tmux et security\"",
+    "printf '%s\\n' 'rtk proxy'",
+    "echo push; echo git",
+    "git status && echo push",
+    "git commit -m 'pas de push' --dry-run",
+    "ls # git push",
+    "ls\n# git push\n# tmux ls\nls",
+    "git status\n# l'export d'Eugène : jamais de git branch -D ici\nls",
+    "# l'apostrophe d'un commentaire\necho 'ok'",
+    "sed -i '' -e 's/a/b/' -e 's/c/d/' note.txt && echo fini",
+    "echo a \\\n  b # l'export",
+    "grep -n 'git push' note.txt || true",
+    "echo $'l\\'export' # git push",
+    "cat <<EOF\n$(echo bonjour)\ngit push\nEOF",
+    "echo \"<<EOF\"\necho fin",
+    "echo \"a # git push\"",
+    "git commit --dry-run -F - <<'EOF'\nl'export : ni git push ni tmux\nEOF",
+    "git commit --dry-run -m \"$(cat <<'EOF'\nl'export ne fait ni git push ni tmux\nEOF\n)\"",
+    "cime envoyer --a x --corps \"$(cat <<'EOF'\nNi push ni tmux, d'après l'utilisateur\nEOF\n)\" resume",
+    "x=$(cat <<'EOF'\ngit push\nEOF\n)",
+    "echo $(cat <<'EOF'\ngit push\nEOF\n)",
+    "perl <<'EOF'\n# l'export system(\"git push\")\nprint \"ok\\n\";\nEOF",
+    "echo \"a\n# b' ; git push\"",
+    "echo $'\\x67it push'",
+    "cat <<E\\OF\ngit push\nEOF",
+    "cat <<-EOF\n\tgit push\n\tEOF",
+    "python3 -c 'print(1)  # git push, tmux'",
+    "perl -e 'print \"ok\\n\"; # git push'",
+]

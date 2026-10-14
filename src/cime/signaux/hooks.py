@@ -7,6 +7,7 @@ inscrit des lignes. La prise d'un courrier (`courrier.prendre`) a lieu juste ava
 """
 import os
 import re
+import shlex
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -108,9 +109,74 @@ def signaler_une_fois(conn, projet, *, a, objet, resume, cle, agent=None) -> int
                               objet=objet, equipe=equipe, preuve={"cmd": "facteur", "cle": cle})
 
 
+# L'échec d'import du paquet `cime` lui-même : introuvable (`No module named 'cime'`), ou son
+# dossier, ou son `cime/__init__.py`, illisible. Jamais un sous-module pas encore écrit
+# (`No module named 'cime.nouveau'`) ni un nom manquant (`cannot import name …`) : c'est un
+# test rouge écrit avant son module, pas une installation cassée.
 _IMPORT_CIME = re.compile(
-    r"No module named '?cime'?(?![\w.])|(?:ImportError|ModuleNotFoundError)[^\n]*\bcime\b")
+    r"No module named '?cime'?(?![\w.])"
+    r"|(?:PermissionError|ImportError)\b(?![^\n]*cannot import name)[^\n]*"
+    r"[/\\]cime(?:[/\\]__init__\.py)?['\"]?(?![\w./\\-])")
 PAUSE_IMPORT_CIME = timedelta(hours=1)  # une alerte par agent et par heure : pas de rafale
+
+
+# Seule la sortie d'un programme Python dit qu'un import a échoué. Un `cat`, un `grep`, un `git log`
+# ou une lecture de fichier qui *cite* le texte ne prouve rien : le premier mot de chaque commande
+# de la ligne (après `;`, `&&`, `||`, `|`, `(`, des `X=1` et de `env`/`time`/`nice`/…) doit être
+# un interpréteur ou un lanceur Python. `cime` en est un (son script est lancé par Python), mais
+# il affiche aussi des messages qui citent le texte : sa panne d'import est une trace, donc sa
+# sortie doit porter `Traceback`.
+_LANCEURS_PYTHON = re.compile(r"python[\d.]*|pytest|py\.test|uv|uvx|pip[\d.]*|pipx|coverage")
+_ENVELOPPES_SANS_SENS = {"env", "time", "nice", "nohup", "command", "exec"}
+_AFFECTATION_ENV = re.compile(r"[A-Za-z_]\w*\+?=")
+_TRACE = "Traceback (most recent call last)"
+
+
+def _sans_commentaires(commande: str) -> str:
+    """La commande sans ses commentaires ; si le module garde ne s'importe pas (installation
+    incomplète), la commande brute : un garde cassé ne doit pas faire tomber les hooks."""
+    try:
+        from cime.fondation.garde import sans_commentaires
+    except Exception:
+        return commande
+    return sans_commentaires(commande)
+
+
+def _premiers_mots(commande: str) -> list[str]:
+    """Le nom (sans dossier) du premier mot de chaque commande de la ligne ; [] si illisible."""
+    try:
+        lex = shlex.shlex(_sans_commentaires(commande), posix=True, punctuation_chars="();<>|&\n")
+        lex.whitespace, lex.whitespace_split, lex.commenters = " \t\r", True, ""
+        jetons = list(lex)
+    except ValueError:
+        return []
+    mots, debut = [], True
+    for t in jetons:
+        if t and set(t) <= set("();<>|&\n"):
+            debut = True
+        elif debut and (_AFFECTATION_ENV.match(t) or t in _ENVELOPPES_SANS_SENS
+                        or (mots and mots[-1] in _ENVELOPPES_SANS_SENS
+                            and (t.startswith("-") or t.isdigit()))):
+            if t in _ENVELOPPES_SANS_SENS:
+                mots.append(t)  # repère pour sauter ses options, retiré plus bas
+        elif debut:
+            mots.append(os.path.basename(t))
+            debut = False
+    return [m for m in mots if m not in _ENVELOPPES_SANS_SENS]
+
+
+def _vient_de_python(entree: dict, sortie: str) -> bool:
+    """La sortie vient-elle d'une commande Bash qui exécute du Python ? Sans commande lisible : non."""
+    if entree.get("tool_name") != "Bash":
+        return False
+    outil = entree.get("tool_input")
+    commande = outil.get("command") if isinstance(outil, dict) else None
+    if not isinstance(commande, str):
+        return False
+    mots = _premiers_mots(commande)
+    if any(_LANCEURS_PYTHON.fullmatch(m) for m in mots):
+        return True
+    return "cime" in mots and _TRACE in sortie
 
 
 def _sortie_de_l_outil(entree: dict) -> str:
@@ -129,7 +195,8 @@ def sur_import_cime_manquant(conn, projet, agent, entree) -> list[int]:
     """La sortie d'un outil dit que `cime` ne s'importe pas (bac à sable de l'agent qui ne couvre
     pas la source) : un `signalement` →Assistant et →l'utilisateur, une fois par agent et par heure.
     Le hook tourne hors du bac à sable : lui seul peut l'écrire quand l'agent est muet."""
-    trouve = _IMPORT_CIME.search(_sortie_de_l_outil(entree))
+    sortie = _sortie_de_l_outil(entree)
+    trouve = _IMPORT_CIME.search(sortie) if _vient_de_python(entree, sortie) else None
     if trouve is None:
         return []
     nom = agent or "inconnu"

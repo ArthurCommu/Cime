@@ -3,11 +3,13 @@
 `decider(entree, projet)` reçoit le JSON d'un hook `PreToolUse` et retourne un
 motif (refus) ou `None`. Il ne lève jamais.
 """
+import io
 import sqlite3
 import os
 import re
 import shlex
 import subprocess
+import tokenize
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -91,11 +93,13 @@ M_ERREUR = ("le garde n'a pas pu analyser cette commande (erreur interne) et ell
             "rtk proxy, tmux) : refusée par prudence. Signale-le à "
             "ton supérieur.")
 
-# Repli textuel prudent. Une copie volontaire vit dans hook.py (REPLI), pour le cas où
-# ce module est absent ; un test vérifie que les deux listes restent identiques.
-_REPLI = [re.compile(r"\bgit\b[^;&|]*\bpush\b"), re.compile(r"\bsecurity\b"),
-          re.compile(r"\bgit\b[^;&|]*\bbranch\b[^;&|]*\s-(d|D|-delete)\b"),
-          re.compile(r"\brtk\s+proxy\b"),
+# Repli textuel prudent, ligne par ligne : aucun motif ne traverse une fin de ligne (« git » ici
+# et « push » dans un commentaire plus bas ne font pas une commande). Une copie volontaire vit
+# dans hook.py (REPLI), pour le cas où ce module est absent ; un test vérifie que les deux
+# listes restent identiques.
+_REPLI = [re.compile(r"\bgit\b[^;&|\n]*\bpush\b"), re.compile(r"\bsecurity\b"),
+          re.compile(r"\bgit\b[^;&|\n]*\bbranch\b[^;&|\n]*[^\S\n]-(d|D|-delete)\b"),
+          re.compile(r"\brtk[^\S\n]+proxy\b"),
           re.compile(r"\btmux\b")]
 _SEP = "\x1f"  # remplace `\;` (séparateur tmux, fin de `find -exec`)
 _PROF_MAX = 8
@@ -105,7 +109,10 @@ _AFFECTATION = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\+?=")
 PROTEGEES = (VAR_AGENT, VAR_PROJET, "CLAUDECODE")  # identité et projet : jamais affectés
 _ECRIT_ENVIRON = re.compile(
     r"environ\s*\[[^\]]*\]\s*(?<![=!<>])=(?!=)|environ\s*\.\s*(pop|update|setdefault|clear)\b"
-    r"|\bdel\s+[\w.]*environ|\b(putenv|unsetenv|setenv)\b|\benv\s*=")
+    r"|\bdel\s+[\w.]*environ|\b(putenv|unsetenv|setenv)\b"
+    # `env = …`, `env={…}` : un environnement fabriqué. Ni une comparaison (`env ==`), ni le
+    # passage d'aucun environnement ou de celui du processus (`env=None`, `env=os.environ`).
+    r"|\benv\s*=(?!=)(?!\s*(?:None|os\.environ)\s*(?:[,);\n]|$))")
 _CLIENTS_SQLITE = {"sqlite3", "litecli", "sqlite-utils"}
 _ECRIT_TOUS = {"mv", "rm", "touch", "tee", "truncate", "unlink", "shred"}
 _ECRIT_DESTINATION = {"cp", "ln", "install", "rsync"}
@@ -119,7 +126,6 @@ ASSISTANT = "assistant"  # identité de l'Assistant (`cime lancer assistant`)
 _MERGE_VALEUR = {"-m", "-s", "-X", "-F", "--message", "--strategy", "--strategy-option",
                  "--into-name", "--cleanup", "--file"}
 _MERGE_CONTINUITE = {"--abort", "--continue", "--quit"}  # ne fusionnent rien de nouveau
-_HEREDOC = re.compile(r"(?<!<)<<(?!<)(-?)\s*(?:'([^']*)'|\"([^\"]*)\"|\\?([A-Za-z_][\w.-]*))")
 
 
 # descripteur collé à sa redirection (`2>&1`, `1>f`, `0<f`) : début de mot, chiffres, `>` ou `<`
@@ -143,6 +149,8 @@ class _Contexte:
         self.auto = {}  # par référence "auto" : équipe, sha, annonce, réglage, fichiers
         self.prefixe = None
         self.manifeste = None
+        self.variables = {}  # `x=valeur` posées seules dans la commande, lues par `$x`
+        self.alias = {}      # `alias nom=valeur` posés dans la commande
         if projet is not None:
             try:
                 m = lire_manifeste(Path(projet))
@@ -179,9 +187,13 @@ def decider(entree: dict, projet: Path | None) -> str | None:
         # calcule sur une absence certifie ») : repli textuel prudent, Bash seulement.
         try:
             commande = (entree.get("tool_input") or {}).get("command")
-            if entree.get("tool_name") == "Bash" and isinstance(commande, str) \
-                    and any(r.search(commande) for r in _REPLI):
-                return M_ERREUR
+            if entree.get("tool_name") == "Bash" and isinstance(commande, str):
+                try:
+                    texte = sans_commentaires(commande)
+                except Exception:
+                    texte = commande  # le retrait lui-même en panne : texte entier
+                if _ressemble(texte):
+                    return M_ERREUR
         except Exception:
             pass
         return None
@@ -217,9 +229,263 @@ def fusions_detaillees(entree: dict, projet: Path | None) -> list[dict]:
 
 # --- découpage -------------------------------------------------------------
 
+def _ressemble(texte: str) -> bool:
+    """Une ligne du texte ressemble-t-elle à une action interdite ? Les continuations (`\\` en
+    fin de ligne) sont d'abord jointes : `git \\⏎ push` est une seule ligne pour le shell."""
+    texte = texte.replace("\\\n", " ")
+    return any(r.search(texte) for r in _REPLI)
+
+
 def _repli(texte: str) -> None:
-    if any(r.search(texte) for r in _REPLI):
+    if _ressemble(texte):
         raise _Refus(M_REPLI)
+
+
+# --- texte d'un shell : commentaires, chaînes $'…', heredocs ------------------------------
+#
+# `_lire` parcourt un texte comme le shell le découpe : guillemets simples et doubles, `$'…'`,
+# `\x`, `$( … )`, backticks, `${ … }`, `$(( … ))`, heredocs. Un `#` n'ouvre un commentaire que
+# s'il commence un mot hors de tout guillemet. Au moindre doute (construction mal suivie,
+# guillemet resté ouvert), rien n'est plus retiré à partir de la ligne en cause : retirer un
+# commentaire ne doit jamais pouvoir cacher une commande que le shell exécute.
+
+_SEPARE_MOT = " \t\n;&|("  # après l'un d'eux, ou en début de texte, un mot commence (`(#` à part)
+_FIN_DELIMITEUR = " \t\n;&|<>()"  # fin du mot délimiteur d'un heredoc
+# ouvertures, de la plus longue à la plus courte : (texte, contexte ouvert)
+_OUVERTURES = [("$((", "(("), ("$(", "$("), ("${", "${"), ("`", "`"), ("$'", "$'"),
+               ('$"', '"'), ("'", "'"), ('"', '"')]
+_GUILLEMETS = {"$'", "'", '"'}
+
+
+class _Heredoc:
+    def __init__(self, operateur: int, substitutions: list[int], cite: bool, corps: int,
+                 fin_corps: int, apres: int):
+        self.operateur = operateur  # position de `<<`
+        self.substitutions = substitutions  # ouvertures des `$(` et backticks qui l'entourent
+        self.cite = cite            # délimiteur cité : le corps n'est pas développé
+        self.corps = corps          # début du corps
+        self.fin_corps = fin_corps  # début de la ligne du délimiteur
+        self.apres = apres          # après la ligne du délimiteur
+
+
+class _Lecture:
+    """Ce que `_lire` trouve dans un texte de shell, en positions dans ce texte."""
+
+    def __init__(self, texte: str):
+        self.texte = texte
+        self.commentaires = []  # (début, fin) : du `#` à la fin de sa ligne
+        self.ansi = []          # (début, fin) : une chaîne `$'…'`, guillemets compris
+        self.heredocs = []      # _Heredoc, dans l'ordre du texte
+        self.doute = None       # début de la première ligne douteuse
+
+    def douter(self, pos: int) -> None:
+        debut = self.texte.rfind("\n", 0, pos) + 1
+        if self.doute is None or debut < self.doute:
+            self.doute = debut
+
+    def retirables(self) -> list[tuple[int, int]]:
+        """Les commentaires qu'on peut retirer : avant toute ligne douteuse, hors shebang."""
+        return [(a, b) for a, b in self.commentaires
+                if (self.doute is None or a < self.doute)
+                and not (a == 0 and self.texte.startswith("#!"))]
+
+
+def _ouverture(texte: str, i: int, contexte: str):
+    """(contexte ouvert, longueur) si une chaîne ou une substitution s'ouvre en i."""
+    for debut, genre in _OUVERTURES:
+        if texte.startswith(debut, i) and not (contexte == '"' and genre in _GUILLEMETS):
+            return genre, len(debut)
+    return None
+
+
+def _ouvrir_heredoc(texte: str, i: int, pile: list, attente: list, lu: _Lecture) -> int:
+    """`<<` ou `<<-` en i : lit le mot délimiteur et met le heredoc en attente de la fin de la
+    ligne. Rend la position qui suit le mot."""
+    j = i + 2
+    tiret = texte.startswith("-", j)
+    j += tiret
+    while j < len(texte) and texte[j] in " \t":
+        j += 1
+    mot, cite = [], False
+    while j < len(texte) and texte[j] not in _FIN_DELIMITEUR:
+        c = texte[j]
+        if c in "'\"":
+            fin = texte.find(c, j + 1)
+            if fin < 0:  # délimiteur mal fermé : on ne le suit pas
+                lu.douter(i)
+                return j
+            mot.append(texte[j + 1:fin])
+            cite, j = True, fin + 1
+        elif c == "\\" and j + 1 < len(texte):
+            mot.append(texte[j + 1])
+            cite, j = True, j + 2
+        else:
+            mot.append(c)
+            j += 1
+    if mot:
+        substitutions = [p for g, p in pile if g in ("$(", "`")]
+        attente.append((i, substitutions, "".join(mot), tiret, cite))
+    return j
+
+
+def _ligne_delimiteur(texte: str, debut: int, delim: str, tiret: bool, cite: bool):
+    """(début, après) de la ligne qui ferme le heredoc, cherchée à partir de `debut` ; None si
+    elle manque. Dans un corps non cité, un `\\` final joint la ligne à la suivante."""
+    k, suite = debut, False
+    while True:
+        fin = texte.find("\n", k)
+        fin = len(texte) if fin < 0 else fin
+        ligne = texte[k:fin]
+        if not suite and (ligne.lstrip("\t") if tiret else ligne) == delim:
+            return k, min(fin + 1, len(texte))
+        suite = not cite and (len(ligne) - len(ligne.rstrip("\\"))) % 2 == 1
+        if fin >= len(texte):
+            return None
+        k = fin + 1
+
+
+def _corps_heredocs(texte: str, i: int, attente: list, lu: _Lecture) -> int:
+    """Fin (texte[i] == "\\n") d'une ligne qui ouvre des heredocs : leurs corps suivent, l'un
+    après l'autre. Un délimiteur absent laisse la suite lue comme du code. Rend la position
+    où reprendre."""
+    debut = i + 1
+    for operateur, substitutions, delim, tiret, cite in attente:
+        trouve = _ligne_delimiteur(texte, debut, delim, tiret, cite)
+        if trouve is None:
+            break
+        lu.heredocs.append(_Heredoc(operateur, substitutions, cite, debut, *trouve))
+        debut = trouve[1]
+    attente.clear()
+    return debut
+
+
+def _lire(texte: str) -> _Lecture:
+    lu, pile, attente = _Lecture(texte), [("code", 0)], []
+    i, debut_mot = 0, True
+    while i < len(texte):
+        haut, c = pile[-1][0], texte[i]
+        if haut == "'":
+            if c == "'":
+                pile.pop()
+            i += 1
+        elif haut in ("$'", "`") and c == "\\":
+            i += 2
+        elif haut == "$'":
+            if c == "'":
+                lu.ansi.append((pile.pop()[1], i + 1))
+            i += 1
+        elif haut == "`":  # quotes non suivies dans des backticks : déjà en doute
+            if c == "`":
+                pile.pop()
+            i += 1
+        elif c == "\\":
+            if not (texte.startswith("\\\n", i) and haut in ("code", "(", "$(")):
+                debut_mot = False  # caractère échappé ; une continuation, elle, ne coupe rien
+            i += 2
+        elif _ouverture(texte, i, haut):
+            genre, longueur = _ouverture(texte, i, haut)
+            if genre == "`" or (genre in _GUILLEMETS and haut in ("${", "((")):
+                lu.douter(i)  # backticks, guillemets dans ${ } ou $(( )) : règles mal suivies
+            pile.append((genre, i))
+            i += longueur
+            debut_mot = False
+        elif haut == '"':
+            if c == '"':
+                pile.pop()
+            i += 1
+        elif haut == "${":
+            if c == "}":
+                pile.pop()
+            elif c == "{":
+                lu.douter(i)
+                pile.append(("${", i))
+            i += 1
+        elif haut in ("((", "a("):
+            if haut == "((" and texte.startswith("))", i):
+                pile.pop()
+                i += 2
+                continue
+            if c == "(":
+                pile.append(("a(", i))
+            elif c == ")":
+                if haut == "((":
+                    lu.douter(i)
+                pile.pop()
+            i += 1
+        else:  # du code : au niveau du texte, dans ( ), dans $( )
+            i, debut_mot = _lire_code(texte, i, debut_mot, pile, attente, lu)
+    if len(pile) > 1:  # quelque chose reste ouvert : la suite n'est pas sûre
+        lu.douter(pile[1][1])
+    return lu
+
+
+def _lire_code(texte, i, debut_mot, pile, attente, lu) -> tuple[int, bool]:
+    """Un pas de `_lire` dans du code. Rend (position suivante, un mot commence-t-il)."""
+    c, haut = texte[i], pile[-1][0]
+    # `(#` n'ouvre pas de commentaire : en zsh, `ls (#i)x` est un motif, pas un commentaire
+    if c == "#" and debut_mot and texte[i - 1:i] != "(":
+        fin = texte.find("\n", i)
+        fin = len(texte) if fin < 0 else fin
+        if all(g in ("code", "(") for g, _ in pile):
+            lu.commentaires.append((i, fin))
+        else:  # commentaire dans $( ) : bash 3.2, bash récents et zsh ne s'y accordent pas
+            lu.douter(i)
+        return fin, True
+    if texte.startswith("<<<", i):
+        return i + 3, True
+    if texte.startswith("<<", i):
+        return _ouvrir_heredoc(texte, i, pile, attente, lu), False
+    if texte.startswith("((", i) and debut_mot:
+        pile.append(("((", i))
+        return i + 2, False
+    if c == "(":
+        # `<(` et `>(` se lisent comme `$(` : une substitution
+        pile.append(("$(" if texte[i - 1:i] in ("<", ">") else "(", i))
+    elif c == ")" and haut in ("(", "$("):
+        pile.pop()
+    elif c == "\n" and attente:
+        return _corps_heredocs(texte, i, attente, lu), True
+    return i + 1, c in _SEPARE_MOT
+
+
+def sans_commentaires(texte: str) -> str:
+    """Le texte d'un shell sans ses commentaires ; les corps de heredoc ne sont pas touchés, la
+    ligne de shebang est gardée. Au moindre doute, la ligne en cause et la suite restent."""
+    morceaux, k = [], 0
+    for a, b in _lire(texte).retirables():
+        morceaux.append(texte[k:a])
+        k = b
+    morceaux.append(texte[k:])
+    return "".join(morceaux)
+
+
+_ECHAPPEMENT_ANSI = re.compile(
+    r"\\(?:x([0-9A-Fa-f]{1,2})|u([0-9A-Fa-f]{1,4})|U([0-9A-Fa-f]{1,8})|([0-7]{1,3})|c(.)|(.))", re.S)
+_ECHAPPEMENTS = {"n": "\n", "t": "\t", "r": "\r", "a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b",
+                 "f": "\f", "v": "\v"}
+
+
+def _decoder_ansi(m: re.Match) -> str:
+    hexa = m.group(1) or m.group(2) or m.group(3)
+    if hexa:
+        return chr(min(int(hexa, 16), 0x10FFFF))
+    if m.group(4):
+        return chr(int(m.group(4), 8) & 0xFF)
+    if m.group(5):
+        return chr(ord(m.group(5)) & 0x1F)
+    return _ECHAPPEMENTS.get(m.group(6), m.group(6))
+
+
+def _ansi_c(texte: str) -> str:
+    """Chaque `$'…'` récrit en la chaîne `'…'` qu'il désigne, que shlex sait lire
+    (`$'\\x67it push'` est `git push`)."""
+    lu = _lire(texte)
+    morceaux, k = [], 0
+    for a, b in lu.ansi:
+        morceaux += [texte[k:a], shlex.quote(_ECHAPPEMENT_ANSI.sub(_decoder_ansi, texte[a + 2:b - 1]))]
+        k = b
+    morceaux.append(texte[k:])
+    return "".join(morceaux)
 
 
 def _fin_paren(s: str, i: int) -> int:
@@ -276,25 +542,91 @@ def _substitutions(s: str, guillemets: bool = True) -> list[str]:
     return res
 
 
-def _heredocs(texte: str) -> tuple[str, list[tuple[str, str, bool]]]:
-    """Retire les corps de heredoc : (texte restant, [(corps, ligne, délimiteur cité)])."""
-    lignes, garde, corps = texte.split("\n"), [], []
-    i = 0
-    while i < len(lignes):
-        ligne = lignes[i]
-        garde.append(ligne)
-        i += 1
-        for m in _HEREDOC.finditer(ligne):
-            delim = m.group(2) if m.group(2) is not None else (
-                m.group(3) if m.group(3) is not None else m.group(4))
-            for j in range(i, len(lignes)):
-                fin = lignes[j].lstrip("\t") if m.group(1) else lignes[j]
-                if fin == delim:
-                    cite = m.group(4) is None or m.group(0).find("\\") >= 0
-                    corps.append(("\n".join(lignes[i:j]), ligne, cite))
-                    i = j + 1
-                    break
-    return "\n".join(garde), corps
+def _heredocs(texte: str) -> tuple[str, list[tuple[str, str, bool, bool]]]:
+    """Retire les corps de heredoc : (texte restant, [(corps, ligne qui l'ouvre, délimiteur
+    cité, lu par un shell quoi qu'il arrive)]). Seul un `<<` que le shell lit comme tel ouvre
+    un heredoc (ni entre guillemets, ni dans un commentaire). Un corps est lu par un shell
+    quand son ouverture suit une ligne douteuse, ou quand il sort d'une substitution qui sert
+    de nom de commande (`$(cat <<EOF … EOF)` : le texte produit est exécuté)."""
+    lu = _lire(texte)
+    reste, corps, k = [], [], 0
+    for h in lu.heredocs:
+        reste.append(texte[k:h.corps])
+        k = h.apres
+        shell = (lu.doute is not None and h.operateur >= lu.doute) or \
+            any(_en_tete_de_commande(texte, p) for p in h.substitutions)
+        corps.append((texte[h.corps:h.fin_corps].removesuffix("\n"), _ligne_ouvrante(texte, h),
+                      h.cite, shell))
+    reste.append(texte[k:])
+    return "".join(reste), corps
+
+
+def _en_tete_de_commande(texte: str, pos: int) -> bool:
+    """La substitution ouverte en `pos` est-elle le nom d'une commande ? Pas la valeur d'une
+    affectation (`x=$(…)`) ni un argument (`echo "$(…)"`)."""
+    if texte[pos - 1:pos] == "=":
+        return False
+    avant = texte[:pos].rstrip(" \t\"'")
+    if not avant or avant[-1] in ";&|(\n{":
+        return True
+    dernier = re.split(r"[\s;&|()]", avant)[-1]
+    return dernier in _MOTS_CLES or dernier in _ENVELOPPES or bool(_AFFECTATION.match(dernier))
+
+
+def _ligne_ouvrante(texte: str, h: _Heredoc) -> str:
+    """La ligne du `<<` ; si elle finit par `|`, la commande qui suit le corps lit aussi."""
+    debut = texte.rfind("\n", 0, h.operateur) + 1
+    fin = texte.find("\n", h.operateur)
+    ligne = texte[debut:fin if fin >= 0 else len(texte)]
+    if ligne.rstrip().endswith("|"):
+        suite = texte.find("\n", h.apres)
+        ligne += " " + texte[h.apres:suite if suite >= 0 else len(texte)]
+    return ligne
+
+
+_LECTEURS_SHELL = _SHELLS | {"eval", "source"}  # un heredoc qu'ils lisent est du shell
+
+
+def _destinataire(ligne: str) -> str | None:
+    """Ce que devient le corps d'un heredoc ouvert sur `ligne` : "shell" s'il y a un shell (ou
+    `eval`, `source`) parmi ses mots, le nom de l'interpréteur s'il y en a un, None sinon (du
+    texte : `cat`, `tee`, `git commit -F -`, `cime`…)."""
+    try:
+        mots = _jetons(_ansi_c(sans_commentaires(ligne)))
+    except ValueError:  # ligne qu'on ne sait pas découper : tous ses mots comptent
+        mots = re.findall(r"[^\s;&|<>()'\"`$]+", ligne)
+    noms = [_base(p) for m in mots for p in m.split()]  # `ssh h 'bash -s'` : bash compte
+    if any(n in _LECTEURS_SHELL for n in noms):
+        return "shell"
+    return next((n for n in noms if _INTERPRETE.match(n)), None)
+
+
+def _python_sans_commentaires(code: str) -> str:
+    """Code Python sans ses commentaires (tokenize) ; le texte entier s'il ne se découpe pas."""
+    try:
+        coupes = {t.start[0]: t.start[1] for t in tokenize.generate_tokens(io.StringIO(code).readline)
+                  if t.type == tokenize.COMMENT}
+    except (tokenize.TokenError, SyntaxError, ValueError):
+        return code
+    return "\n".join(ligne[:coupes[k + 1]] if k + 1 in coupes else ligne
+                     for k, ligne in enumerate(code.split("\n")))
+
+
+def _code_sans_commentaires(interprete: str, code: str) -> str:
+    """Les commentaires du langage retirés : Python par tokenize, perl et ruby comme un shell
+    (`#` en début de mot, hors chaîne). Les chaînes restent : `run("git push")` se voit."""
+    if interprete.startswith("python"):
+        return _python_sans_commentaires(code)
+    if interprete in ("perl", "ruby"):
+        return sans_commentaires(code)
+    return code
+
+
+def _verifier_code(interprete: str, code: str) -> None:
+    """Code d'un interpréteur (`-c`, `-e`, heredoc) : repli ligne par ligne et identité."""
+    code = _code_sans_commentaires(interprete, code)
+    _repli(code)
+    _identite_code(code)
 
 
 def _jetons(texte: str) -> list[str]:
@@ -308,19 +640,24 @@ def _jetons(texte: str) -> list[str]:
 def _analyser(texte: str, cwd, ctx: _Contexte, prof: int) -> None:
     if prof > _PROF_MAX:
         raise _Refus(M_PROFOND)
+    # les commentaires d'abord : un `\` qui finit un commentaire ne continue pas la ligne
+    texte = sans_commentaires(texte)
     texte = texte.replace("\\\n", " ").replace("\\;", _SEP)
     texte = re.sub(r"(?<!\S)(['\"]);\1(?!\S)", _SEP, texte)  # `';'` : séparateur tmux
     texte, corps = _heredocs(texte)
-    for contenu, ligne, cite in corps:
-        if re.search(r"\b(ba|z|da|k)?sh\b", ligne):
+    for contenu, ligne, cite, shell in corps:
+        # le corps va à qui le lit : un shell l'exécute, un interpréteur aussi ; pour les
+        # autres (`cat`, `tee`, `cime`…) c'est du texte.
+        lecteur = "shell" if shell else _destinataire(ligne)
+        if lecteur == "shell":
             _analyser(contenu, cwd, ctx, prof + 1)
-        elif re.search(r"\b(python[\d.]*|perl|ruby|node|osascript)\b", ligne):
-            _repli(contenu)
-            _identite_code(contenu)
+        elif lecteur:
+            _verifier_code(lecteur, contenu)
         if not cite:
             for s in _substitutions(contenu, guillemets=False):
                 _analyser(s, _INCONNU, ctx, prof + 1)
     texte = _FD_REDIRECTION.sub("", texte)  # `2>&1`, `1>f` : le chiffre est un descripteur, pas un mot
+    texte = _ansi_c(texte)
     try:
         subs = _substitutions(texte)
         jetons = _jetons(texte)
@@ -359,6 +696,96 @@ def _analyser(texte: str, cwd, ctx: _Contexte, prof: int) -> None:
         i += 1
     if mots:
         _commande(mots, cwd, ctx, prof)
+    _noms_inconnus(texte, ctx)
+
+
+# --- noms de commande qu'on ne lit pas -----------------------------------------------------
+
+_ENVELOPPES = {"command", "builtin", "exec", "nohup", "env", "sudo", "doas", "time", "nice",
+               "caffeinate", "xargs", "timeout", "stdbuf"}
+
+
+def _sans_substitutions(s: str) -> str:
+    """Chaque `$( … )` et chaque backtick hors guillemets simples remplacé par `$_` : une
+    valeur qu'on ne connaît pas, à sa place dans le mot."""
+    res, i, etat = [], 0, None
+    while i < len(s):
+        c = s[i]
+        if c == "\\" and etat != "'":
+            res.append(s[i:i + 2])
+            i += 2
+            continue
+        if etat is None and c in "'\"" or etat == c:
+            etat = None if etat else c
+        elif etat != "'" and s.startswith("$(", i):
+            res.append("$_")
+            i = _fin_paren(s, i + 2) + 1
+            continue
+        elif etat != "'" and c == "`":
+            fin = s.find("`", i + 1)
+            if fin < 0:
+                raise ValueError("backtick non fermé")
+            res.append("$_")
+            i = fin + 1
+            continue
+        res.append(c)
+        i += 1
+    return "".join(res)
+
+
+def _noms_inconnus(texte: str, ctx: _Contexte) -> None:
+    """Une commande dont le nom ne se lit pas (`$(echo git) push`, `$x push` où x n'est pas
+    posé dans la commande) est jugée sur ses arguments : ceux d'un push, d'une suppression de
+    branche ou de `rtk proxy` sont refusés comme tels."""
+    try:
+        jetons = _jetons(_sans_substitutions(texte))
+    except ValueError:
+        return
+    mots = []
+    for t in jetons + [";"]:
+        if not (t and set(t) <= set("();<>|&\n")):
+            mots.append(t)
+            continue
+        while mots and (_AFFECTATION.match(mots[0]) or mots[0] in _MOTS_CLES
+                        or _base(mots[0]) in _ENVELOPPES or mots[0].startswith("-")):
+            mots = mots[1:]
+        if mots and any(c in _developper_mot(mots[0], ctx) for c in "$`"):
+            _arguments_interdits(mots[1:])
+        mots = []
+
+
+def _arguments_interdits(args: list[str]) -> None:
+    if "push" in args or "send-pack" in args:
+        raise _Refus(M_PUSH)
+    if "branch" in args and _supprime_une_branche(args[args.index("branch") + 1:]):
+        raise _Refus(M_BRANCHE)
+    if args[:1] == ["proxy"]:
+        raise _Refus(M_PROXY)
+
+
+# --- variables et alias posés dans la commande ------------------------------------------------
+
+_VARIABLE = re.compile(r"\$(?:\{([A-Za-z_]\w*)\}|([A-Za-z_]\w*))")
+
+
+def _developper_mot(mot: str, ctx: _Contexte) -> str:
+    """`$x` et `${x}` remplacés par la valeur posée plus tôt dans la commande (`x=git`) ; une
+    variable inconnue reste telle quelle."""
+    return _VARIABLE.sub(lambda m: ctx.variables.get(m.group(1) or m.group(2), m.group(0)), mot)
+
+
+def _developper(mots: list[str], ctx: _Contexte) -> list[str]:
+    """Les mots de la commande, variables connues remplacées ; un nom de commande qui en
+    devient plusieurs mots est coupé comme le shell le coupe (`G="git push"; $G`)."""
+    mots = [_developper_mot(m, ctx) for m in mots]
+    return (mots[0].split() or mots[:1]) + mots[1:]
+
+
+def _alias(args: list[str], ctx: _Contexte) -> None:
+    for a in args:
+        nom, egal, valeur = a.partition("=")
+        if egal and nom:
+            ctx.alias[nom] = valeur
 
 
 # --- commande simple -------------------------------------------------------
@@ -387,7 +814,7 @@ def _sauter_options(mots: list[str], avec_valeur: set[str]) -> list[str]:
     return mots[i:]
 
 
-def _commande(mots: list[str], cwd, ctx: _Contexte, prof: int, indirect=False):
+def _commande(mots: list[str], cwd, ctx: _Contexte, prof: int, indirect=False, developpe=False):
     env = {}
     while mots:
         w, b = mots[0], _base(mots[0])
@@ -436,14 +863,26 @@ def _commande(mots: list[str], cwd, ctx: _Contexte, prof: int, indirect=False):
         else:
             break
     if not mots:
+        ctx.variables.update(env)  # `g=git` seul : la variable vaut pour la suite de la commande
+        return cwd
+    if not developpe:
+        large = _developper(mots, ctx)
+        if large != mots:  # jugée aussi avec ses variables remplacées (`g=git; $g push`)
+            _commande(large, cwd, ctx, prof, indirect, developpe=True)
+    if mots[0] in ctx.alias:  # `alias g=git` puis `g push` : jugée comme `git push`
+        nom = mots[0]
+        valeur = ctx.alias.pop(nom)  # un alias ne se développe pas dans lui-même
+        try:
+            _analyser(" ".join([valeur] + [shlex.quote(m) for m in mots[1:]]), cwd, ctx, prof + 1)
+        finally:
+            ctx.alias[nom] = valeur
         return cwd
     b, args = _base(mots[0]), mots[1:]
 
     for k, w in enumerate(mots[:-1]):
         if _INTERPRETE.match(_base(w)) and mots[k + 1] in ("-c", "-e", "-E", "-r") \
                 and k + 2 < len(mots):
-            _repli(mots[k + 2])
-            _identite_code(mots[k + 2])
+            _verifier_code(_base(w), mots[k + 2])
         if _INTERPRETE.match(_base(w)) and mots[k + 1] == "-m" and k + 2 < len(mots) \
                 and mots[k + 2] in _CLIENTS_SQLITE:
             raise _Refus(M_SQLITE.format(client=f"{_base(w)} -m {mots[k + 2]}"))
@@ -466,7 +905,9 @@ def _commande(mots: list[str], cwd, ctx: _Contexte, prof: int, indirect=False):
         return _INCONNU
     if b == "security":
         raise _Refus(M_SECURITY)
-    if b in _SHELLS:
+    if b == "alias":
+        _alias(args, ctx)
+    elif b in _SHELLS:
         _shell(args, cwd, ctx, prof)
     elif b in ("source", "."):
         if args:
@@ -519,7 +960,14 @@ def _shell(args, cwd, ctx, prof):
             _script(a, cwd, ctx, prof)
             return
         i += 1
-    _repli(ctx.texte)  # le shell lit son entrée : on ne voit que le texte brut
+    _repli(_lu_par_un_shell(ctx.texte))  # le shell lit son entrée : on ne voit que le texte
+
+
+def _lu_par_un_shell(texte: str) -> str:
+    """Tout ce qu'un shell qui lit son entrée pourrait exécuter : la commande et chacun de ses
+    corps de heredoc, lus comme du shell, sans leurs commentaires."""
+    reste, corps = _heredocs(sans_commentaires(texte))
+    return "\n".join([reste] + [sans_commentaires(c) for c, *_ in corps])
 
 
 def _script(chemin, cwd, ctx, prof, shebang=False):
@@ -581,18 +1029,25 @@ def _positionnels(reste):
     return [a for a in reste if not a.startswith("-")]
 
 
+def _supprime_une_branche(reste: list[str]) -> bool:
+    """Les arguments de `git branch` demandent-ils une suppression (`-d`, `-D`, `--delete`) ?"""
+    for a in reste:
+        if a == "--":
+            break
+        if a.startswith("--"):
+            if len(a) >= 3 and "--delete".startswith(a):
+                return True
+        elif a.startswith("-") and ("d" in a or "D" in a):
+            return True
+    return False
+
+
 def _git_sous_commande(sub, reste, cwd, env, opts_git, ctx, prof):
     if sub in ("push", "send-pack") or (sub in ("subtree", "lfs") and "push" in reste):
         raise _Refus(M_PUSH)
     if sub == "branch":
-        for a in reste:
-            if a == "--":
-                break
-            if a.startswith("--"):
-                if len(a) >= 3 and "--delete".startswith(a):
-                    raise _Refus(M_BRANCHE)
-            elif a.startswith("-") and ("d" in a or "D" in a):
-                raise _Refus(M_BRANCHE)
+        if _supprime_une_branche(reste):
+            raise _Refus(M_BRANCHE)
         if any(a in ("-f", "--force") for a in reste) and \
                 set(_positionnels(reste)) & ctx.refs:
             raise _Refus(M_REF)
@@ -855,13 +1310,24 @@ def _identite_code(code: str) -> None:
         raise _Refus(M_IDENTITE.format(nom=next(n for n in PROTEGEES if n in code)))
 
 
+_CODE_OU_MODULE = set("mceE")  # `-m pytest`, `-c code`, `-e code` : la suite leur appartient
+_OPTION_A_VALEUR = set("WXr")   # `-W ignore`, `-X dev`, `-r json` : valeur collée ou au mot suivant
+
+
 def _script_interprete(args: list[str], cwd) -> None:
-    """`python script.py` : le script est lu avec la même règle d'identité."""
+    """`python script.py` : le script est lu avec la même règle d'identité. Après `-m <module>`, `-c <code>` ou `-e <code>`, les mots qui suivent sont les
+    arguments du module ou du code (`python -m pytest tests/x.py`) : aucun script à lire."""
     k = 0
     while k < len(args):
         a = args[k]
-        if a in ("-m", "-c", "-e", "-E", "-r", "-W", "-X"):
-            k += 2
+        if a.startswith("-") and not a.startswith("--") and len(a) > 1:
+            for j, lettre in enumerate(a[1:]):  # options courtes groupées : `-Bm`, `-Wignore`
+                if lettre in _CODE_OU_MODULE:
+                    return
+                if lettre in _OPTION_A_VALEUR:
+                    k += j == len(a) - 2  # valeur au mot suivant
+                    break
+            k += 1
         elif a.startswith("-"):
             k += 1
         else:

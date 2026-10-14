@@ -458,6 +458,20 @@ def test_erreur_interne_de_la_garde_laisse_passer_le_reste(monkeypatch, commande
     assert garde.decider(_bash(commande), None) is None
 
 
+# Le repli juge chaque ligne : « git » ici et « push » plus bas ne font pas une commande. Une
+# continuation (`\` en fin de ligne) fait une seule ligne.
+@pytest.mark.parametrize("commande", ["git status\n# Ni push", "git log\n" + "x\n" * 30 + "# push"])
+def test_garde_absente_repli_ne_traverse_pas_les_lignes(projet, monkeypatch, capsys, commande):
+    _sans_module_garde(monkeypatch)
+    assert lancer(monkeypatch, capsys, "PreToolUse", _bash(commande)) == ""
+
+
+def test_garde_absente_repli_joint_les_continuations(projet, monkeypatch, capsys):
+    _sans_module_garde(monkeypatch)
+    sortie = json.loads(lancer(monkeypatch, capsys, "PreToolUse", _bash("git \\\n  push")))
+    assert sortie["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
 def test_repli_du_hook_identique_a_celui_de_la_garde():
     from cime.fondation import garde
     assert hook.REPLI == [r.pattern for r in garde._REPLI]

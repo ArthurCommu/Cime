@@ -83,10 +83,11 @@ def _inscrire(conn, agent, entree, evenement, details) -> int:
 
 
 # Copie volontaire de garde._REPLI : ce repli doit marcher quand le module garde est
-# absent (installation cassée). Un test vérifie que les deux listes sont identiques.
-REPLI = [r"\bgit\b[^;&|]*\bpush\b", r"\bsecurity\b",
-         r"\bgit\b[^;&|]*\bbranch\b[^;&|]*\s-(d|D|-delete)\b",
-         r"\brtk\s+proxy\b",
+# absent (installation cassée). Un test vérifie que les deux listes sont identiques. Aucun
+# motif ne traverse une fin de ligne ; les continuations (`\` final) sont jointes avant.
+REPLI = [r"\bgit\b[^;&|\n]*\bpush\b", r"\bsecurity\b",
+         r"\bgit\b[^;&|\n]*\bbranch\b[^;&|\n]*[^\S\n]-(d|D|-delete)\b",
+         r"\brtk[^\S\n]+proxy\b",
          r"\btmux\b"]
 M_GARDE_ABSENTE = ("le garde est indisponible (installation incomplète) et cette commande "
                    "ressemble à une action interdite (push, suppression de branche, "
@@ -99,7 +100,7 @@ def _repli_garde_absente(entree: dict) -> str | None:
     import re
     commande = (entree.get("tool_input") or {}).get("command")
     if entree.get("tool_name") == "Bash" and isinstance(commande, str) \
-            and any(re.search(r, commande) for r in REPLI):
+            and any(re.search(r, commande.replace("\\\n", " ")) for r in REPLI):
         return M_GARDE_ABSENTE
     return None
 
