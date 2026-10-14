@@ -246,8 +246,8 @@ def verifier_reglage(static):
     assert g["cinq"]["retour"] == [["plafond de workers : 5", "plafond-retour"]] and g["cinq"]["select"]["choisie"] == ["5"]
     assert g["defaut"]["retour"] == [["plafond de workers : défaut (3)", "plafond-retour"]]
     assert g["deja"]["retour"] == [["déjà 6", "plafond-retour"]]
-    assert g["erreur"]["retour"] == [["écriture impossible", "plafond-retour plafond-erreur"]]
-    assert g["reseau"] == [["hôte injoignable (réseau)", "plafond-retour plafond-erreur"]]
+    assert g["erreur"]["retour"] == [["écriture impossible", "plafond-retour texte-erreur"]]
+    assert g["reseau"] == [["hôte injoignable (réseau)", "plafond-retour texte-erreur"]]
     assert g["erreur"]["select"]["choisie"] == ["6"], "après une erreur, le choix revient à ce que dit l'état"
     assert not any(g[k]["select"]["disabled"] for k in ("cinq", "defaut", "deja", "erreur"))
     assert g["cinq"]["role"] == ["status"]
@@ -329,8 +329,8 @@ MUTATIONS_EXECUTEES = {
     "figé : appel permis": (COM, "if (plafondEnCours || actionsFigees) return;", "if (plafondEnCours) return;", verifier_reglage),
     "figé : contrôle actif": (WK, "disabled: Boolean(demande) || fige,", "disabled: Boolean(demande),", verifier_reglage),
     "figé : titre perdu": (WK, "title: fige ? PHRASE_ACTIONS_FIGEES : null, onchange", "onchange", verifier_reglage),
-    "« déjà » en rouge": (WK, "r.resultat === 'erreur' ? ' plafond-erreur'", "r.resultat !== 'ok' ? ' plafond-erreur'", verifier_reglage),
-    "erreur en neutre": (WK, "r.resultat === 'erreur' ? ' plafond-erreur' : ''", "''", verifier_reglage),
+    "« déjà » en rouge": (WK, "r.resultat === 'erreur' ? ' texte-erreur'", "r.resultat !== 'ok' ? ' texte-erreur'", verifier_reglage),
+    "erreur en neutre": (WK, "r.resultat === 'erreur' ? ' texte-erreur' : ''", "''", verifier_reglage),
     "message de l'hôte perdu": (WK, "if (!r || !r.message) return null;", "return null;", verifier_reglage),
     "message qui ne disparaît pas": (COM, "plafondMinuteur = setTimeout(() => { plafondRetour = null; rerendre(); }, RETOUR_PLAFOND_MS);", "", verifier_reglage),
     "ancien message gardé": (COM, "  clearTimeout(plafondMinuteur);\n  plafondRetour = null;\n", "", verifier_reglage),

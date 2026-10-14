@@ -361,8 +361,8 @@ button.chemins-suite:hover { color: var(--bleu-clair); }
   color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
 .workers-ligne:hover { color: var(--texte-doux); }
-.workers-fleche { font-size: 10px; color: var(--discret); }
-.workers-detail { display: flex; flex-direction: column; gap: 4px; padding: 4px 0 4px 8px; border-left: 1px solid var(--bord); }
+.workers-fleche { font-size: 11px; color: var(--discret); }
+.workers-detail { display: flex; flex-direction: column; gap: 8px; padding: 0; padding-left: 8px; border-left: 1px solid var(--bord); }
 .workers-detail p { margin: 0; }
 .plafond-reglage { display: flex; align-items: center; gap: 8px; min-height: 32px; }
 .plafond-choix {
@@ -371,7 +371,6 @@ button.chemins-suite:hover { color: var(--bleu-clair); }
 }
 .plafond-choix:disabled { opacity: 0.6; cursor: progress; }
 .plafond-retour { color: var(--secondaire); }
-.plafond-retour.plafond-erreur { color: var(--rouge-clair); }
 @media (pointer: coarse), (max-width: 760px) {
   .workers-ligne, .plafond-reglage, .plafond-choix { min-height: 44px; }
   .plafond-choix { font-size: 16px; }

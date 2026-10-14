@@ -46,7 +46,7 @@ function choixPlafond(charge) {
 function retourDuReglage() {
   const r = retourPlafond();
   if (!r || !r.message) return null;
-  return el('p', { class: `plafond-retour${r.resultat === 'erreur' ? ' plafond-erreur' : ''}`, role: 'status' }, r.message);
+  return el('p', { class: `plafond-retour${r.resultat === 'erreur' ? ' texte-erreur' : ''}`, role: 'status' }, r.message);
 }
 
 /** La ligne dépliante et son panneau. `redessiner()` redessine le rail ou la feuille. */

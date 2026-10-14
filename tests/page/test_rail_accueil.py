@@ -59,7 +59,8 @@ def verifier_rail_accueil(js):
     attentes = _corps(rail, "function blocAttentes(", "\n}\n")
     assert "const titre = 'Ce qui t’attend';" in attentes
     assert "const attentes = attentesOuvertes(etat);" in attentes
-    assert "const mode = interrupteurMode(etat);" in attentes and "const encadre = encadreMode(etat, redessiner);" in attentes  # le mode autonome reste dessiné, même sans attente
+    assert "const mode = interrupteurMode(etat);" in attentes and "const encadre = [encadreMode(etat, redessiner), ligneWorkers(etat, redessiner)];" in attentes  # le mode autonome reste dessiné, même sans attente
+    assert "[encadre, el('div', { class: 'inconnu-bloc' }" in attentes and "[encadre, el('div', { class: 'rail-calme' }" in attentes and "    encadre,\n" in attentes  # ligneWorkers est dans les trois sorties du bloc, par encadre
     assert attentes.count("classe, mode)") == 3, "l'interrupteur est à droite du titre dans les trois cas : inconnu, rien n'attend, des attentes"
     assert "if (attentes === null) {" in attentes
     assert "'Ce qui t’attend : inconnu (sources en échec).'" in attentes and "class: 'inconnu-bloc'" in attentes
