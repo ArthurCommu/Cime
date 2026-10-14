@@ -227,7 +227,8 @@ def test_lancer_ecrit_le_fichier_genere(projet, tmux, maison, tmp_path):
     contenu = json.loads(fichier.read_text(encoding="utf-8"))
     # le contenu statique du rôle (worker = agent) est conservé
     assert contenu["marque"] == "agent"
-    assert contenu["permissions"] == {"allow": ["Bash(ls*)"], "deny": []}
+    # le statique est conservé ; la règle qui interdit l'outil à fenêtre s'y ajoute
+    assert contenu["permissions"] == {"allow": ["Bash(ls*)"], "deny": ["AskUserQuestion"]}
     s = contenu["sandbox"]
     assert s["filesystem"]["allowRead"][0] == str(projet)
     assert str(tmp_path / "depot-x") not in s["filesystem"]["allowRead"]
@@ -652,3 +653,30 @@ def test_integration_ne_commite_ni_ne_fusionne_jamais(projet):
     coord = json.loads(reglages_mod.ecrire_reglages_generes(projet, "coord-x", "coord", m).read_text())
     assert not any(r.startswith(("Bash(git add", "Bash(git commit", "Bash(git merge"))
                    for r in coord["permissions"]["deny"])
+
+
+# --- fenêtres bloquantes : un agent ne pose pas de question par une fenêtre ---------------
+
+@pytest.mark.parametrize("role,identite,integration", [
+    ("worker", "worker-x-y", False), ("coord", "coord-x", False),
+    ("coord", "worker-integration-r1", True),
+])
+def test_un_agent_ne_peut_pas_appeler_ask_user_question(projet, role, identite, integration):
+    fichier = reglages_mod.ecrire_reglages_generes(projet, identite, role, lire_manifeste(projet),
+                                                   integration=integration)
+    contenu = json.loads(fichier.read_text(encoding="utf-8"))
+    assert "AskUserQuestion" in contenu["permissions"]["deny"]
+    assert contenu["permissions"]["deny"].count("AskUserQuestion") == 1
+    assert contenu["skillOverrides"] == {"auto-mode-setup": "off"}
+
+
+def test_l_assistant_garde_ask_user_question_et_l_offre_du_mode_auto(projet):
+    fichier = reglages_mod.ecrire_reglages_generes(projet, "assistant", "assistant",
+                                                   lire_manifeste(projet))
+    contenu = json.loads(fichier.read_text(encoding="utf-8"))
+    assert "AskUserQuestion" not in contenu["permissions"]["deny"]
+    assert "skillOverrides" not in contenu
+
+
+def test_le_nom_d_outil_reste_nu_sous_rtk():
+    assert reglages_mod._avec_rtk(["AskUserQuestion"]) == ["AskUserQuestion"]

@@ -1,0 +1,22 @@
+
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Haiku 4.5 · Claude Pro
+ ▝▝   ▝▝   /…/exemple/projet
+
+❯ Pose-moi la question avant de choisir la bibliothèque
+
+⏺ J'ai besoin de ton avis avant de continuer.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ☐ Bibliothèque
+
+Quelle bibliothèque de dates faut-il utiliser pour ce module ?
+
+❯ 1. Bibliothèque standard
+     Aucune dépendance, moins de fonctions
+  2. Bibliothèque tierce
+     Plus complète, une dépendance de plus
+  3. Type something.
+  4. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel

@@ -41,6 +41,13 @@ INTERDITS_INTEGRATION = tuple(
     r for v in ("add", "commit", "merge")
     for r in (f"Bash(git {v}*)", f"Bash(rtk git {v}*)", f"Bash(git -C * {v}*)", f"Bash(rtk git -C * {v}*)"))
 ROLES = ("commun", "agent", "coordinateur")
+# Un agent ne pose aucune question à l'utilisateur : la fenêtre à choix que l'outil ouvre bloque
+# sa session sans que personne la voie. Il écrit à son supérieur. Nom d'outil nu : `_avec_rtk`
+# ne touche que les règles `Bash(...)`.
+OUTIL_INTERDIT_AUX_AGENTS = "AskUserQuestion"
+# Supprime la commande et l'offre « Teach auto mode about your environment? » qui s'ouvre en fin
+# de tour et bloque l'agent de la même façon.
+SURCHARGES_DE_COMPETENCES_AGENT = {"auto-mode-setup": "off"}
 # Commun à tous (Assistant compris) : pas de push, pas de secrets.
 INTERDITS_COMMUN = (
     "Bash(git push*)", "Bash(git -C * push*)",
@@ -517,8 +524,12 @@ def contenu_reglages_generes(projet: Path, identite: str, role: str, manifeste: 
                                   Path.home().resolve(), os.getuid(),
                                   zones_du_bac_a_sable(projet, identite, integration),
                                   dossier_outil(), regles,
-                                  INTERDITS_INTEGRATION if integration else (),
+                                  (*(() if identite == "assistant" else (OUTIL_INTERDIT_AUX_AGENTS,)),
+                                   *(INTERDITS_INTEGRATION if integration else ())),
                                   dossier_source_cime())
+    if identite != "assistant":
+        contenu["skillOverrides"] = {**contenu.get("skillOverrides", {}),
+                                     **SURCHARGES_DE_COMPETENCES_AGENT}
     return contenu
 
 

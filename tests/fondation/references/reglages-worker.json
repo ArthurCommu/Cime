@@ -7,7 +7,9 @@
     "allow": [
       "Bash(ls*)"
     ],
-    "deny": []
+    "deny": [
+      "AskUserQuestion"
+    ]
   },
   "sandbox": {
     "enabled": true,
@@ -46,5 +48,8 @@
       ]
     }
   },
-  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/worker-x-y"
+  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/worker-x-y",
+  "skillOverrides": {
+    "auto-mode-setup": "off"
+  }
 }

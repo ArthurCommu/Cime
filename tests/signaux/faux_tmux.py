@@ -7,7 +7,8 @@ REGLE = "─" * 40
 
 class FauxTmux:
     def __init__(self, sessions=(), silence=100.0):
-        # nom de session -> {"invite": texte tapé, "activite": époque de la dernière activité}
+        # nom de session -> {"invite": texte tapé, "activite": époque de la dernière activité,
+        #                    "ecran": écran forcé, facultatif}
         self.sessions = {nom: {"invite": "", "activite": time.time() - silence}
                          for nom in sessions}
         self.appels = []
@@ -37,7 +38,9 @@ class FauxTmux:
                 return self._ok("78 45\n")
             return self._ok(f"{self.sessions[session]['activite']}\n")
         if commande == "capture-pane":
-            sortie = f"{REGLE}\n❯\xa0{self.sessions[session]['invite']}\n{REGLE}\n"
+            etat = self.sessions[session]
+            # `ecran` forcé : `capture-pane` le rend tel quel (une fenêtre, un écran étranger)
+            sortie = etat["ecran"] if "ecran" in etat else f"{REGLE}\n❯\xa0{etat['invite']}\n{REGLE}\n"
             self.captures += 1
             resultat = self._ok(sortie)
             for f in list(self.apres_capture):
@@ -75,3 +78,10 @@ class FauxTmux:
         """L'utilisateur tape au clavier."""
         self.sessions[session]["invite"] += texte
         self.sessions[session]["activite"] = time.time()
+
+    def forcer_ecran(self, session, ecran):
+        """La session montre `ecran` à toute capture, quoi qu'on tape (None : retour à l'invite simulée)."""
+        if ecran is None:
+            self.sessions[session].pop("ecran", None)
+        else:
+            self.sessions[session]["ecran"] = ecran

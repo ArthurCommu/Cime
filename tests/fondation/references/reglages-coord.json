@@ -6,7 +6,9 @@
       "Bash(git -C <RACINE>/depot/.orga/worktrees/z add*)",
       "Bash(git -C <RACINE>/depot/.orga/worktrees/z commit*)"
     ],
-    "deny": []
+    "deny": [
+      "AskUserQuestion"
+    ]
   },
   "sandbox": {
     "enabled": true,
@@ -45,5 +47,8 @@
       ]
     }
   },
-  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/coord-z"
+  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/coord-z",
+  "skillOverrides": {
+    "auto-mode-setup": "off"
+  }
 }

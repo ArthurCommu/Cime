@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from cime.fondation import fermeture, invite
+from cime.fondation import fenetre, fermeture, invite
 from cime.fondation.projet import equipe_de, lire_manifeste, session_tmux
 from cime.fondation import registre
 from cime.fondation.registre import ouvrir
@@ -23,6 +23,8 @@ UTILISATEUR = "utilisateur"
 ASSISTANT = "assistant"
 EVENEMENTS_DE_TOUR = ("UserPromptSubmit", "PostToolUse", "Stop", "StopFailure")
 FIN_DE_TOUR = ("Stop", "StopFailure")
+# raisons de non-frappe derrière lesquelles une fenêtre de choix peut se cacher
+RAISONS_A_VERIFIER = ("tour", "invite", "inconnu")
 
 
 def _dormir(secondes: float) -> None:
@@ -395,6 +397,10 @@ def livrer(ctx, agent) -> None:
     avant = ctx.memoire.occupe_par.get(agent)
     ctx.memoire.detail.pop(agent, None)
     raison = _conditions(ctx, agent, session)
+    if raison in RAISONS_A_VERIFIER and _secondes(ctx.maintenant, messages[0]["horodatage"]) \
+            >= echeances.FENETRE_DELAI.total_seconds() and _signaler_fenetre(ctx, agent, session,
+                                                                              _capturer(session)):
+        raison = "fenetre"          # une fenêtre attend une réponse : rien n'est tapé, on a signalé
     ctx.memoire.occupe_par[agent] = raison
     _noter_differe(ctx, agent, avant, raison, messages[0])
     _noter_inconnu_prolonge(ctx, agent, raison, messages[0])
@@ -405,6 +411,35 @@ def livrer(ctx, agent) -> None:
     pris = courrier.prendre(ctx.conn, agent, "tmux", "cime", {"capture_avant": "vide"})
     if pris is not None:
         _frapper(ctx, agent, session, pris)
+
+
+def _signaler_fenetre(ctx, agent, session, capture) -> bool:
+    """Si `capture` montre une fenêtre de choix, signale à l'Assistant et à l'utilisateur ce qu'elle
+    demande (une fois par session de l'agent) et renvoie True : rien ne doit être tapé dans une
+    fenêtre, et le facteur n'appuie sur aucune touche. Sans fenêtre (ou si la zone de saisie existe,
+    donc une vraie saisie), renvoie False sans rien faire."""
+    trouvee = fenetre.lire(capture)
+    if trouvee is None:
+        return False
+    ctx.memoire.occupe_par[agent] = "fenetre"
+    ctx.memoire.detail[agent] = {"fenetre": trouvee["genre"]}
+    ouverture = _dernier(ctx.conn, agent, ("SessionStart",))
+    cle = f"session:{ouverture[0] if ouverture else 0}"
+    question, options = trouvee["question"], trouvee["options"]
+    resume = f"{session} attend une réponse dans une fenêtre ({trouvee['genre']}) : {question}"
+    if len(resume) > 160:
+        resume = resume[:159] + "…"
+    corps = "\n".join([question, *(f"{n}. {libelle}" for n, libelle in enumerate(options, 1))])[:600]
+    destinataires = [UTILISATEUR] if agent == ASSISTANT else [ASSISTANT, UTILISATEUR]
+    nouveaux = [hooks.signaler_une_fois(ctx.conn, ctx.projet, a=a, objet=f"fenetre-bloquante:{agent}",
+                                        agent=agent, cle=cle, resume=resume, corps=corps)
+                for a in destinataires]
+    if any(n is not None for n in nouveaux):
+        registre.inscrire_evenement(
+            ctx.conn, agent=agent, session_id=None, evenement="FenetreBloquante",
+            details={"agent": agent, "session": session, "genre": trouvee["genre"],
+                     "question": question, "options": options})
+    return True
 
 
 def _signaler_occupe(ctx, agent, message_id, depuis_iso) -> None:
@@ -577,8 +612,11 @@ def _frapper(ctx, agent, session, pris) -> None:
         courrier.echouer(conn, pris.id, "cime", preuve)
 
     # (a) relecture immédiate de l'invite
-    avant = _invite(session)
+    avant, capture_avant = _lire_invite(session)
     if avant != "":
+        if _signaler_fenetre(ctx, agent, session, capture_avant):
+            abandon({"fenetre": True}, "une fenêtre attend une réponse", capture_avant)
+            return
         memoire.occupe_par[agent] = "invite"
         abandon({"invite_changee": True}, "l'invite n'était plus vide")
         return
@@ -617,15 +655,18 @@ def _frapper(ctx, agent, session, pris) -> None:
         _tmux("send-keys", "-t", cible, *(["BSpace"] * len(texte)))
         verif = _invite(session)
         efface = verif is not None and _norme(verif) == reste
+    en_fenetre = False
     if not efface:
         memoire.frappes_perdues[agent] = texte          # le texte peut apparaître plus tard : on s'en souviendra
-        sup = UTILISATEUR
-        hooks.signaler_une_fois(
-            conn, ctx.projet, a=sup, objet=f"collision-invite:{agent}", agent=agent,
-            cle=f"courrier:{pris.id}",
-            resume=f"un message de {courrier.emetteur_lisible(pris.messages[0]['de'])} "
-                   f"à {agent} est resté mêlé à votre saisie, rien n'a été envoyé")
-    memoire.occupe_par[agent] = "invite"
+        # une fenêtre de choix n'est pas une saisie de l'utilisateur : on la signale pour ce qu'elle est
+        en_fenetre = capture is not None and _signaler_fenetre(ctx, agent, session, capture)
+        if not en_fenetre:
+            hooks.signaler_une_fois(
+                conn, ctx.projet, a=UTILISATEUR, objet=f"collision-invite:{agent}", agent=agent,
+                cle=f"courrier:{pris.id}",
+                resume=f"un message de {courrier.emetteur_lisible(pris.messages[0]['de'])} "
+                       f"à {agent} est resté mêlé à votre saisie, rien n'a été envoyé")
+    memoire.occupe_par[agent] = "fenetre" if en_fenetre else "invite"
     abandon({"collision": True, "efface": efface, "ecran": _releve_ecran(apres, texte)},
             "collision avec une saisie dans l'invite", capture)
 

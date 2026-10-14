@@ -1,0 +1,17 @@
+
+ ▐▛███▛█   Claude Code v2.1.292
+▝▜██████▀  Haiku 4.5 · Claude Pro
+ ▝▝   ▝▝   /…/exemple/projet
+
+⏺ Je termine le tour.
+
+✻ Brewed for 12s · done 10:02
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ Auto mode works better when it knows your environment. Teach it about the infrastructure your team trusts?
+
+ ❯ 1. Yes
+   2. Not now
+   3. Don't show again
+
+ Enter to confirm · Esc to cancel

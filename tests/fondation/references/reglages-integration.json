@@ -5,6 +5,7 @@
       "Bash(ls*)"
     ],
     "deny": [
+      "AskUserQuestion",
       "Bash(git add*)",
       "Bash(rtk git add*)",
       "Bash(git -C * add*)",
@@ -57,5 +58,8 @@
       ]
     }
   },
-  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/worker-integration-r1"
+  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/worker-integration-r1",
+  "skillOverrides": {
+    "auto-mode-setup": "off"
+  }
 }

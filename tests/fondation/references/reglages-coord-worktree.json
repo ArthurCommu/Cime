@@ -6,7 +6,9 @@
       "Bash(git -C <RACINE>/depot/.orga/worktrees/x add*)",
       "Bash(git -C <RACINE>/depot/.orga/worktrees/x commit*)"
     ],
-    "deny": []
+    "deny": [
+      "AskUserQuestion"
+    ]
   },
   "sandbox": {
     "enabled": true,
@@ -45,5 +47,8 @@
       ]
     }
   },
-  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/coord-x"
+  "autoMemoryDirectory": "<RACINE>/depot/.orga/etat/memoire/coord-x",
+  "skillOverrides": {
+    "auto-mode-setup": "off"
+  }
 }

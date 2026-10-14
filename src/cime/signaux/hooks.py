@@ -91,7 +91,7 @@ def signaler(conn, projet, *, a, objet, resume, agent=None, unique=False,
         equipe=equipe, corps=corps, preuve={"cmd": "hook", "pid": os.getpid()})
 
 
-def signaler_une_fois(conn, projet, *, a, objet, resume, cle, agent=None) -> int | None:
+def signaler_une_fois(conn, projet, *, a, objet, resume, cle, agent=None, corps=None) -> int | None:
     """`cime → a` `signalement`, une seule fois pour (a, objet, cle) — `cle` est gardée dans la
     preuve de la transition `inscrit`, donc un facteur redémarré ne redit rien et la clé ne
     se mêle pas au texte livré."""
@@ -106,7 +106,8 @@ def signaler_une_fois(conn, projet, *, a, objet, resume, cle, agent=None) -> int
     except ErreurProjet:
         equipe = None
     return commandes.inscrire(conn, de="cime", a=a, nature="signalement", resume=resume[:160],
-                              objet=objet, equipe=equipe, preuve={"cmd": "facteur", "cle": cle})
+                              objet=objet, equipe=equipe, corps=corps,
+                              preuve={"cmd": "facteur", "cle": cle})
 
 
 # L'échec d'import du paquet `cime` lui-même : introuvable (`No module named 'cime'`), ou son

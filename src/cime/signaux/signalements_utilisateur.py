@@ -32,7 +32,7 @@ _OUVERTS = (f"SELECT m.id, m.objet, m.horodatage, {_DERNIERE} FROM messages m"
             f" AND {_DERNIERE} NOT IN ('clos', 'abandonne', 'echec') ORDER BY m.id")
 # Objets dont la cause est la vie de l'agent : son prochain UserPromptSubmit ou Stop la lève
 _CAUSES_VIVANTES = ("erreur-api:", "melange:", "collision-invite:", "invite-non-validee:", "occupe:",
-                    "session-absente:")
+                    "session-absente:", "fenetre-bloquante:")
 
 
 def _evenement_apres(conn, agent, depuis, noms, source=None) -> bool:

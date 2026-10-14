@@ -32,6 +32,7 @@ ASSISTANT_SOURD = timedelta(minutes=2)   # courrier tmux non acquitté après un
 
 PAS_FACTEUR = 2.0                         # s : un tour du facteur
 PEREMPTION_BATTEMENT = 30                 # s : au-delà, le facteur est dit arrêté
+FENETRE_DELAI = timedelta(seconds=30)     # un message attend depuis là : on regarde si une fenêtre bloque l'agent
 SILENCE_FENETRE = 3.0                     # s : `window_activity` inchangé avant de taper
 INCONNU_PROLONGE_S = SILENCE_FENETRE * 10  # s : écran `inconnu` avec un message en attente, noté (événement + journal)
 PAUSE_VALIDATION = 1.0                     # s : entre l'Enter et la relecture de l'invite (défaut 4)
