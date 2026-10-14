@@ -72,9 +72,9 @@ def test_essai_reel_de_bout_en_bout(tmp_path, monkeypatch, capsys):
         etapes.append((titre, _decision(r.stdout)))
         return r.stdout
 
-    # 1. option inactive : l'accord par sha est exigé, comme avant
+    # 1. option inactive : la garde refuse le `git merge` et renvoie à la file
     sortie = pre("1. option inactive, aucune annonce")
-    assert "exige un accord de l'utilisateur non consommé" in sortie and "Fusions automatiques" not in sortie
+    assert "cime fusionner" in sortie and "Fusions automatiques" not in sortie
 
     # 2. L'utilisateur active l'option (CIME_AGENT=utilisateur dans l'environnement du sous-processus)
     r = _cime(projet, "assistant", "fusions-auto", "active")
@@ -87,9 +87,9 @@ def test_essai_reel_de_bout_en_bout(tmp_path, monkeypatch, capsys):
     assert "fusions automatiques : active\n" in r.stdout
     etapes.append(("2c. `cime fusions-auto` (lecture, Assistant)", "\n".join(r.stdout.splitlines()[:4]) + " …"))
 
-    # 3. sans annonce : refus, avec la condition qui échoue
+    # 3. option active, sans annonce : le `git merge` reste refusé
     sortie = pre("3. option active, sans annonce")
-    assert "condition 4" in sortie and "exige un accord de l'utilisateur non consommé" in sortie
+    assert "cime fusionner" in sortie
 
     # 4. l'annonce, par `cime envoyer`
     r = _cime(projet, "assistant", "envoyer", "--a", "utilisateur", "--nature", "rapport_utilisateur",
@@ -97,30 +97,26 @@ def test_essai_reel_de_bout_en_bout(tmp_path, monkeypatch, capsys):
     assert r.returncode == 0, r.stderr
     etapes.append(("4. `cime envoyer … fusion-auto:x:<sha>`", f"exit 0, message n°{r.stdout.strip()}"))
 
-    # 5. passage
-    assert pre("5. option active, avec annonce") == ""
+    # 5. même option active et même annonce faite : le `git merge` à la main n'est plus une voie
+    sortie = pre("5. option active, avec annonce")
+    assert "cime fusionner" in sortie
 
-    # 6. la fusion elle-même, puis PostToolUse
+    # 6. une fusion faite hors du hook n'est ni journalisée ni consommée par PostToolUse
     _git("merge", "--no-ff", "-m", "x", "equipe/x", cwd=projet)
     r = _cime(projet, "assistant", "hook", "PostToolUse", entree=_evenement(projet, merge, "PostToolUse"))
     # 2 = texte rendu à l'agent sur stderr : ici « le facteur est arrêté » (il n'y a pas de facteur dans l'essai)
     assert r.returncode in (0, 2) and (r.returncode == 0 or "facteur est arrêté" in r.stderr), r.stderr
-    journal = (projet / ".orga" / "etat" / "fusions.log").read_text().splitlines()
-    assert len(journal) == 2 and journal[1].endswith("resultat=fusionne")
+    assert not (projet / ".orga" / "etat" / "fusions.log").exists()
     conn = sqlite3.connect(projet / ".orga" / "etat" / "registre.sqlite")
     try:
-        lignes = conn.execute("SELECT auteur, action, cible, details, resultat FROM journal"
-                              " WHERE action = 'fusion_auto'").fetchall()
+        lignes = conn.execute("SELECT 1 FROM journal WHERE action = 'fusion_auto'").fetchall()
         clos = conn.execute("SELECT COUNT(*) FROM transitions WHERE etat = 'clos'").fetchone()[0]
     finally:
         conn.close()
-    assert len(lignes) == 1 and lignes[0][:3] == ("assistant", "fusion_auto", f"fusion:x:{sha}")
-    assert json.loads(lignes[0][3]) == {"annonce": 1, "reglage": 1, "fichiers": 2} and lignes[0][4] == "ok"
-    assert clos == 0 and not (projet / ".orga" / "etat" / "hooks-erreurs.log").exists()
-    etapes.append(("6a. PostToolUse : fusions.log", "\n".join(journal)))
-    etapes.append(("6b. PostToolUse : journal du registre", repr(lignes[0])))
+    assert lignes == [] and clos == 0 and not (projet / ".orga" / "etat" / "hooks-erreurs.log").exists()
+    etapes.append(("6. PostToolUse après une fusion à la main", "rien n'est journalisé"))
     etat = json.loads(_cime(projet, "assistant", "etat").stdout)["fusions_auto"]
-    assert etat["active"] and etat["derniere_fusion"]["sha"] == sha and etat["derniere_fusion"]["equipe"] == "x"
+    assert etat["active"]
     etapes.append(("7. `cime etat` → fusions_auto", json.dumps({k: v for k, v in etat.items() if k != "reserves"})))
 
     with capsys.disabled():

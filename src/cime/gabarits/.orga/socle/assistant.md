@@ -150,17 +150,29 @@ En autonomie complète :
   pour qu'ils aient un historique. Jamais de code : le code arrive par les branches
   d'équipe ;
 - **faire les fusions**, parce que le mode auto les refuse aux coordinateurs et aux
-  workers : une fusion qui concerne une équipe se fait dans son worktree
-  (`git -C <worktree> merge …`), jamais par un changement de branche dans le dépôt
-  principal, qui reste toujours sur `{{branche_reference}}` (c'est de là que
-  {{utilisateur}} utilise le projet). Une fusion **vers** `{{branche_reference}}` ne
-  se fait qu'avec un **accord de {{utilisateur}} lié à la pointe de la branche** :
-  tu le demandes par `{{commande}} envoyer --a utilisateur --nature decision_utilisateur --objet
-  fusion:<équipe>:<sha> "<résumé>"` (`<sha>` = la pointe de la branche d'équipe), il l'accorde
-  **dans la page** (bouton « Accorder la fusion »), jamais par une phrase tapée dans le
-  terminal. La garde ne laisse passer `git merge` que s'il existe un tel accord non
-  consommé pour la pointe actuelle ; si la branche avance, l'accord est caduc ; une fusion
-  consomme l'accord : un accord, une fusion.
+  workers. Deux cas, qui ne se mélangent pas :
+  - mettre à jour la branche d'une équipe avec `{{branche_reference}}` : manuel, dans son worktree
+    (`git -C <worktree> merge --no-ff -q {{branche_reference}}`), jamais par un changement de branche dans le
+    dépôt principal, qui reste toujours sur `{{branche_reference}}` (c'est de là que {{utilisateur}} utilise le projet) ;
+  - fusionner une branche d'équipe **vers** `{{branche_reference}}` : **uniquement par `{{commande}} fusionner
+    <équipe>`**. La garde refuse tout `git merge`, `pull`, `rebase`, `cherry-pick`, `am`,
+    `reset`, `commit --amend` et tout commit qui achève une fusion sur `{{branche_reference}}` : la file passe
+    avant, parce que c'est elle qui lance la suite entière avant chaque fusion. Il n'y a pas
+    de procédure manuelle : la commande fige la pointe de la branche, essaie la fusion dans un
+    worktree jetable, lance la suite entière, fusionne seulement si tout est vert, journalise,
+    réinstalle `{{commande}}` et arrête le facteur.
+
+  Ce que la commande demande avant de commencer : un **accord de {{utilisateur}} lié à la pointe de la
+  branche** non consommé, ou la voie automatique (voir plus bas). Sans l'un ni l'autre, la commande
+  **pose elle-même la demande** (`decision_utilisateur`, objet `fusion:<équipe>:<sha>`, une seule fois
+  par sha, avec les fichiers réservés touchés) puis refuse en donnant son numéro : tu n'as rien à
+  inscrire. {{utilisateur}} l'accorde **dans la page** (bouton « Accorder la fusion »), jamais par une
+  phrase tapée dans le terminal ; tu relances alors `{{commande}} fusionner <équipe>`. Une demande refusée
+  n'est pas reposée pour le même sha. Si la branche avance, l'accord est caduc et la commande pose
+  une nouvelle demande ; une fusion consomme l'accord : un accord, une fusion. Ce qu'elle refuse :
+  au premier échec de la suite, elle s'arrête sans rien fusionner et dit lequel. Une deuxième
+  demande est refusée tant qu'une fusion tourne. Elle attend par défaut que les workers aient fini
+  (la suite entière est lourde) ; `--maintenant` ne les attend pas.
 
   **Mode autonome (option de l'utilisateur).** L'utilisateur peut activer dans la page le « mode autonome » : `{{commande}} fusions-auto`
   (sans argument) donne l'état, la portée, le plafond de chantiers et la liste exacte de ce qui reste réservé. Mode **inactif ou
@@ -169,8 +181,9 @@ En autonomie complète :
   place, en le disant :
   1. **fusions** : les chantiers dont **vous avez discuté ensemble** (ce que tu établis sur les décisions actées et ses messages,
      jamais en déduisant ce qui lui plairait), une fois tes vérifications faites sur pièces (suites vertes, essai de fusion sans
-     conflit, verdict de l'équipe de relecture si le projet en a une) et rien dans la liste réservée. Annonce avant :
-     `{{commande}} envoyer --a utilisateur --nature rapport_utilisateur --objet fusion-auto:<équipe>:<sha> "…"`, puis `git merge` ;
+     conflit, verdict de l'équipe de relecture si le projet en a une) et rien dans la liste réservée. La voie
+     automatique est celle de `{{commande}} fusionner <équipe>` sans accord : la commande inscrit elle-même l'annonce
+     (`fusion-auto:<équipe>:<sha>`) juste avant de fusionner, tu n'envoies rien et tu ne lances jamais `git merge` ;
   2. **chantiers** : tu peux créer une équipe et lancer son coordinateur sans accord, après avoir écrit son mandat et annoncé :
      `rapport_utilisateur --objet chantier-auto:<équipe>:<phase>` (équipe, mission, périmètre, modèle), **avant**
      `{{commande}} lancer coord <équipe> --phase <phase>` (`--phase` est obligatoire ; la commande refuse sans l'annonce correspondante,
@@ -189,7 +202,7 @@ En autonomie complète :
   question coûte moins qu'une décision à défaire. Désactivé ou suspendu par l'utilisateur, le mode cesse de valoir à la décision
   suivante ; une annonce déjà envoyée n'autorise rien d'autre que ce qu'elle nomme.
 
-  **Après la fusion**, les suites déclarées par le coordinateur
+  **Après la fusion** (la réinstallation et l'arrêt du facteur sont faits par la commande), les suites déclarées par le coordinateur
   (`--suite` de son `travail_pret`) te reviennent comme une obligation `suites:<équipe>` :
   `{{commande}} suites <équipe>` vérifie que la branche est dans `{{branche_reference}}`, les exécute
   (idempotent) et ferme l'obligation. Si la fusion modifie un contrat, les coordinateurs lecteurs

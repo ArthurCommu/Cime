@@ -6,6 +6,7 @@ git jetable pour les fusions. Seul `lancer._lancer` est remplacé : il lancerait
 """
 import json
 import sqlite3
+from types import SimpleNamespace
 
 import pytest
 
@@ -239,15 +240,22 @@ def accord_de_fusion(banc, depot, equipe="alpha", ref=None):
     return r.id
 
 
-def fusionner(banc, depot, ref="equipe/alpha"):
-    """`git merge <ref>` de l'Assistant : sa garde (PreToolUse), le vrai git, puis PostToolUse."""
-    entree = {"tool_name": "Bash", "tool_input": {"command": f"git merge {ref}"}, "cwd": str(depot)}
-    avant = banc.acteur(ASSISTANT).hook("PreToolUse", entree)
-    if '"deny"' in avant.stdout:
-        return False, avant
-    _git("merge", "--no-edit", ref, cwd=depot)
-    banc.acteur(ASSISTANT).hook("PostToolUse", entree)
-    return True, avant
+@pytest.fixture(autouse=True)
+def _file_de_fusion_sans_suite_ni_installation(monkeypatch):
+    """`cime fusionner` en processus : la suite entière, la réinstallation et l'arrêt du facteur sont
+    remplacés (le reste, git compris, est réel)."""
+    from cime.fondation import fusionner as file
+    monkeypatch.setattr(file, "_suite", lambda projet, dossier: (0, "2 passed in 0.10s\n"))
+    monkeypatch.setattr(file, "_workers_actifs", lambda projet: 0)
+    monkeypatch.setattr(file, "_reinstaller", lambda projet: (True, ""))
+    monkeypatch.setattr(file, "_arreter_facteur", lambda projet: "facteur arrêté")
+
+
+def fusionner(banc, depot, equipe="alpha"):
+    """La fusion de l'Assistant : `cime fusionner <équipe>` (la garde refuse `git merge`) ; renvoie
+    (fusionné ?, résultat dont `.stdout` porte tout ce que la commande a dit)."""
+    r = banc.acteur(ASSISTANT).cime("fusionner", equipe, "--maintenant")
+    return r.code == 0, SimpleNamespace(stdout=r.sortie + r.erreur)
 
 
 def journal_fusions(depot):
@@ -269,14 +277,15 @@ def test_decision_de_fusion_sans_reponse_normal(banc_depot, depot):
     main_avant = sha(depot, "main")
     fait, r = fusionner(banc, depot)                                      # sans accord
     assert not fait and "accord" in r.stdout and sha(depot, "main") == main_avant
-    assert journal_fusions(depot) == []
+    assert all(l.endswith("resultat=refuse-accord") for l in journal_fusions(depot))   # le refus se journalise
     accord = accord_de_fusion(banc, depot)                                # avec accord
     fait, _ = fusionner(banc, depot)
-    assert fait and sha(depot, "main") == sha(depot, "equipe/alpha")
+    assert fait and sha(depot, "main") != main_avant
+    _git("merge-base", "--is-ancestor", "equipe/alpha", "main", cwd=depot)     # la branche est dans main
     assert [l.split()[-1] for l in journal_fusions(depot)][-1] == "resultat=fusionne"
     assert etat(banc, accord) == "clos"                                   # consommé
-    assert banc.prouve("SELECT json_extract(preuve, '$.par_evenement') IS NOT NULL FROM transitions"
-                       " WHERE message_id = ? AND etat = 'clos'", (accord,)) == [(1,)]
+    assert banc.prouve("SELECT json_extract(preuve, '$.par_commande') FROM transitions"
+                       " WHERE message_id = ? AND etat = 'clos'", (accord,)) == [("fusionner",)]
     (s, a), = banc.prouve("SELECT m.id, m.a FROM messages m JOIN obligations o ON o.message_id = m.id"
                           " WHERE m.objet = 'suites:alpha' AND o.etat = 'ouverte'")
     assert a == ASSISTANT                                                 # l'obligation « suites »
@@ -293,7 +302,8 @@ def test_decision_de_fusion_sans_reponse_oubli(banc_depot, depot):
     for _ in range(2):
         fait, r = fusionner(banc, depot)
         assert not fait and "accord" in r.stdout
-    assert sha(depot, "main") == main_avant and journal_fusions(depot) == []
+    assert sha(depot, "main") == main_avant
+    assert all(l.endswith("resultat=refuse-accord") for l in journal_fusions(depot))
     banc.faire_tourner(121 * 60, pas=300)
     assert minutes_apres(banc, d, ECHELLE) == [("utilisateur", "relance", 120.0)]
     assert etat(banc, d) == "inscrit" and banc.prouve("SELECT etat FROM obligations WHERE message_id = ?",
@@ -314,20 +324,26 @@ def test_un_accord_une_fusion_normal(banc_depot, depot):
     (travail / "src" / "suite.txt").write_text("suite\n")
     _git("add", "src/suite.txt", cwd=travail)
     _git("commit", "-q", "-m", "suite", cwd=travail)
+    nouveau = sha(depot, "equipe/alpha")
     fait, r = fusionner(banc, depot)
-    assert not fait and "aucun accord pour ce sha" in r.stdout
+    # le sha est nouveau : la commande pose la demande d'accord, le motif des règles est dans son corps
+    assert not fait and "demande #" in r.stdout and "posée" in r.stdout
+    (demande, corps), = banc.prouve("SELECT id, corps FROM messages WHERE nature = 'decision_utilisateur'"
+                                    " AND objet = ?", (f"fusion:alpha:{nouveau}",))
+    assert f"demande #{demande} posée" in r.stdout and "aucun accord pour ce sha" in corps
     assert etat(banc, accord2) != "clos"                                  # jamais consommé
 
 
 def test_un_accord_une_fusion_oubli(banc_depot, depot):
-    """Le PostToolUse de la fusion n'arrive jamais : l'intention est journalisée sans résultat, l'accord reste."""
+    """L'Assistant ne lance pas `cime fusionner` : rien n'est journalisé, l'accord reste libre ; et un
+    `git merge` à la main est refusé, il ne laisse aucune trace non plus."""
     banc = banc_depot
     accord = accord_de_fusion(banc, depot)
     entree = {"tool_name": "Bash", "tool_input": {"command": "git merge equipe/alpha"}, "cwd": str(depot)}
-    assert banc.acteur(ASSISTANT).hook("PreToolUse", entree).stdout == ""     # permise
-    assert banc.acteur(ASSISTANT).inerte().hook("PostToolUse", entree) is None
-    lignes = journal_fusions(depot)
-    assert len(lignes) == 1 and "resultat=" not in lignes[0]
+    avant = banc.acteur(ASSISTANT).hook("PreToolUse", entree)
+    assert '"deny"' in avant.stdout and "cime fusionner" in avant.stdout
+    assert banc.acteur(ASSISTANT).inerte().cime("fusionner", "alpha") is None
+    assert journal_fusions(depot) == []
     assert banc.prouve("SELECT count(*) FROM transitions WHERE etat = 'clos' AND message_id = ?", (accord,)
                        ) == [(0,)]
 

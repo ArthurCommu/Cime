@@ -183,6 +183,25 @@ def _sha_commit(projet: Path, ref: str) -> str:
     return sha if r.returncode == 0 and sha else "inconnu"
 
 
+def ecrire_intentions_fusion(projet: Path, refs: list[str], commande: str, auteur: str,
+                             shas: dict | None = None) -> None:
+    """Une ligne d'intention par branche qui va être fusionnée sur le dépôt principal, puis la
+    pointe de la branche de référence d'avant la fusion (FUSION_AVANT). `shas` : le sha à écrire
+    pour une référence, quand l'appelant l'a déjà figé. Lève en cas d'échec d'écriture :
+    l'appelant décide si cela bloque."""
+    from cime.fondation.registre import horodatage
+    maintenant = horodatage()
+    commande = commande.replace("\r", " ").replace("\n", " ")[:LIMITE_COMMANDE]
+    dossier = Path(projet) / ".orga" / "etat"
+    dossier.mkdir(parents=True, exist_ok=True)
+    with open(dossier / "fusions.log", "a", encoding="utf-8") as f:
+        for ref in refs:
+            sha = (shas or {}).get(ref) or _sha_commit(projet, ref)
+            f.write(f"{maintenant} {auteur} {sha} {ref} {commande}\n")
+    # la pointe de la branche de référence AVANT la fusion : le diff de la fusion
+    (dossier / FUSION_AVANT).write_text(_sha_commit(projet, "HEAD") + "\n", encoding="utf-8")
+
+
 def _journaliser_fusions(projet: Path, entree: dict) -> None:
     """Une ligne d'intention par branche que l'Assistant fait fusionner sur le dépôt
     principal, écrite avant la fusion. Ne bloque jamais la fusion : un échec d'écriture va
@@ -197,18 +216,8 @@ def _journaliser_fusions(projet: Path, entree: dict) -> None:
         refs = garde.fusions_autorisees(entree, projet)
         if not refs:
             return
-        from cime.fondation.registre import horodatage
-        maintenant = horodatage()
         commande = str((entree.get("tool_input") or {}).get("command", ""))
-        commande = commande.replace("\r", " ").replace("\n", " ")[:LIMITE_COMMANDE]
-        dossier = Path(projet) / ".orga" / "etat"
-        dossier.mkdir(parents=True, exist_ok=True)
-        with open(dossier / "fusions.log", "a", encoding="utf-8") as f:
-            for ref in refs:
-                sha = _sha_commit(projet, ref)
-                f.write(f"{maintenant} {garde.ASSISTANT} {sha} {ref} {commande}\n")
-        # la pointe de la branche de référence AVANT la fusion : le diff de la fusion
-        (dossier / FUSION_AVANT).write_text(_sha_commit(projet, "HEAD") + "\n", encoding="utf-8")
+        ecrire_intentions_fusion(projet, refs, commande, garde.ASSISTANT)
     except Exception as e:
         _journaliser_erreur(projet, "PreToolUse", e)
 
@@ -224,6 +233,24 @@ def _resultat(projet: Path, sha: str) -> str:
     except (OSError, subprocess.SubprocessError):
         return "inconnu"
     return {0: "fusionne", 1: "non-fusionne"}.get(r.returncode, "inconnu")
+
+
+def ecrire_resultats_fusion(projet: Path, refs: list[str], auteur: str,
+                            shas: dict | None = None) -> list[tuple[str, str]]:
+    """Une ligne `resultat=fusionne|non-fusionne|inconnu` par branche, lue après la fusion ;
+    renvoie [(sha, résultat)]. Lève en cas d'échec d'écriture."""
+    from cime.fondation.registre import horodatage
+    maintenant = horodatage()
+    dossier = Path(projet) / ".orga" / "etat"
+    dossier.mkdir(parents=True, exist_ok=True)
+    faits = []
+    with open(dossier / "fusions.log", "a", encoding="utf-8") as f:
+        for ref in refs:
+            sha = (shas or {}).get(ref) or _sha_commit(projet, ref)
+            resultat = _resultat(projet, sha)
+            f.write(f"{maintenant} {auteur} {sha} {ref} resultat={resultat}\n")
+            faits.append((sha, resultat))
+    return faits
 
 
 class _Fusions(list):
@@ -245,16 +272,7 @@ def _journaliser_resultats(projet: Path, entree: dict) -> list[tuple[str, str]]:
         faits.refs = list(refs)
         if not refs:
             return faits
-        from cime.fondation.registre import horodatage
-        maintenant = horodatage()
-        dossier = Path(projet) / ".orga" / "etat"
-        dossier.mkdir(parents=True, exist_ok=True)
-        with open(dossier / "fusions.log", "a", encoding="utf-8") as f:
-            for ref in refs:
-                sha = _sha_commit(projet, ref)
-                resultat = _resultat(projet, sha)
-                f.write(f"{maintenant} {garde.ASSISTANT} {sha} {ref} resultat={resultat}\n")
-                faits.append((sha, resultat))
+        faits.extend(ecrire_resultats_fusion(projet, refs, garde.ASSISTANT))
     except Exception as e:
         _journaliser_erreur(projet, "PostToolUse", e)
     return faits
@@ -481,3 +499,11 @@ def _texte_a_rendre(conn, projet, agent, evenement, entree, evenement_id,
     """Courrier à rendre à l'agent (la prise se fait ici, juste avant l'écriture)."""
     from cime.signaux import hooks
     return hooks.rendre(conn, projet, agent, evenement, entree, evenement_id, details)
+
+
+def journaliser_fusion_auto(conn, projet: Path, sha: str, detail: dict) -> None:
+    """La ligne `journal` `fusion_auto` d'une fusion faite par la voie automatique ; `detail` :
+    `equipe`, `annonce`, `reglage`, `fichiers` (ceux de la garde). Une seule par (cible, annonce)."""
+    fusions = _Fusions([(sha, "fusionne")])
+    fusions.details = [dict(detail, voie="auto")]
+    _journaliser_fusions_auto(conn, projet, fusions)

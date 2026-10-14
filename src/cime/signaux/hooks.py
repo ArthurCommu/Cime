@@ -21,8 +21,7 @@ UTILISATEUR = "utilisateur"
 MAX_DETTES_CITEES = 5
 FIN_RECENTE = timedelta(minutes=10)  # un `fin:<t>` posé par `cime terminer` il y a moins que ça
 REPRISE_IGNOREE = ("clear", "resume")  # SessionEnd : la session continue dans le même terminal
-_PREFIXE = re.compile(
-    r"(?:Assistant|coordinateur [a-z0-9-]+|worker [a-z0-9-]+/[a-z0-9-]+|l'utilisateur|Cime) : ")
+_PREFIXE = re.compile(courrier.expression_prefixe())  # les émetteurs que `emetteur_lisible` rend
 _ID = re.compile(r"\(#(\d+)\)")
 
 

@@ -1,5 +1,6 @@
-"""La garde de fusion ne prend plus une redirection (`2>&1`) ni un séparateur (`|`, `&&`)
-pour une seconde branche. Chemin réel : hook PreToolUse de l'Assistant, accord lié au sha."""
+"""La garde de fusion ne prend pas une redirection (`2>&1`) ni un séparateur (`|`, `&&`) pour une
+autorisation : le `git merge` de l'Assistant est refusé sous toutes ses formes. Chemin réel : hook
+PreToolUse de l'Assistant, accord lié au sha."""
 import pytest
 
 from e2e.aides import ASSISTANT, etat
@@ -7,7 +8,7 @@ from e2e.conftest import _git
 from e2e.test_commandes_garde_git import accord_de_fusion, pre
 
 M = 'git merge --no-ff equipe/alpha -m "m"'
-PERMISES = [
+PERMISES = [   # refusées toutes, mais autrefois permises avec un accord
     M,
     M + " 2>&1",
     M + " 2>&1 | tail -4",
@@ -27,23 +28,15 @@ def _pre_depot(banc, depot, commande):
     return refuse, r
 
 
-@pytest.mark.parametrize("commande", PERMISES)
-def test_permise_avec_accord(banc_depot, depot, commande):
-    accord_de_fusion(banc_depot, depot)
-    refuse, r = _pre_depot(banc_depot, depot, commande)
-    assert not refuse, r.stdout
-
-
-def test_git_C_permis_avec_accord(banc_depot, depot):
-    accord_de_fusion(banc_depot, depot)
-    refuse, r = _pre_depot(banc_depot, depot, f"git -C {depot} merge --no-ff equipe/alpha -m m 2>&1 | tail -4")
-    assert not refuse, r.stdout
-
-
-@pytest.mark.parametrize("commande", PERMISES + [f"git -C DEPOT merge equipe/alpha -m m 2>&1"])
-def test_refusee_sans_accord(banc_depot, depot, commande):
+@pytest.mark.parametrize("commande", PERMISES + [f"git -C DEPOT merge --no-ff equipe/alpha -m m 2>&1 | tail -4"])
+@pytest.mark.parametrize("accord", [True, False])
+def test_refusee_avec_ou_sans_accord(banc_depot, depot, commande, accord):
+    """Le `git merge` de l'Assistant est refusé sous toutes ses formes, accord ou non : la fusion
+    passe par `cime fusionner`."""
+    if accord:
+        accord_de_fusion(banc_depot, depot)
     refuse, r = _pre_depot(banc_depot, depot, commande.replace("DEPOT", str(depot)))
-    assert refuse and "accord" in r.stdout
+    assert refuse and "cime fusionner" in r.stdout
 
 
 def test_un_refus_ne_consomme_pas_l_accord(banc_depot, depot):

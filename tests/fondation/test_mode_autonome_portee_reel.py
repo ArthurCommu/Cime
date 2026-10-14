@@ -3,11 +3,15 @@ le vrai hook `cime hook PreToolUse` et les commandes `cime fusions-auto`, `cime 
 sous-processus. `CIME_PROJET` et `CIME_AGENT` passent par l'environnement des sous-processus (`env=`),
 jamais par la ligne de commande ni sur le vrai projet. Lancer avec `-s` pour voir les sorties."""
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 import types
 
 from cime.fondation import init
-from test_fusions_auto_reel import _cime, _decision, _evenement, _git
+from cime.fondation.nom import VAR_AGENT, VAR_PROJET
+from test_fusions_auto_reel import SRC, _cime, _git
 
 
 def _lignes_reglage(projet):
@@ -43,8 +47,14 @@ def test_essai_reel_mode_autonome_portee(tmp_path, monkeypatch, capsys):
     etapes = []
 
     def pre(equipe):
-        r = _cime(projet, "assistant", "hook", "PreToolUse",
-                  entree=_evenement(projet, f"git merge --no-ff -m x equipe/{equipe}", "PreToolUse"))
+        """Le jugement des règles de fusion pour `equipe/<équipe>`, dans un sous-processus, comme le
+        fait `cime fusionner` (le hook, lui, refuse tout `git merge` de l'Assistant) : "" si permis."""
+        code = ("import sys; from pathlib import Path; from cime.fondation.garde import juger_fusion;"
+                " print(juger_fusion(Path(sys.argv[1]), sys.argv[2])[2] or '', end='')")
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("CIME_", "GIT_"))}
+        env.update({VAR_PROJET: str(projet), VAR_AGENT: "assistant", "PYTHONPATH": str(SRC)})
+        r = subprocess.run([sys.executable, "-c", code, str(projet), f"equipe/{equipe}"], env=env,
+                           cwd=projet, capture_output=True, text=True, timeout=60)
         assert r.returncode == 0, r.stderr
         return r.stdout
 
@@ -113,10 +123,10 @@ def test_essai_reel_mode_autonome_portee(tmp_path, monkeypatch, capsys):
         assert r.returncode == 0, r.stderr
     sortie = pre("dep")
     assert sortie == ""
-    etapes.append(("6a. fusion qui touche `pyproject.toml`", _decision(sortie)))
+    etapes.append(("6a. fusion qui touche `pyproject.toml`", sortie or "(permise)"))
     sortie = pre("sec")
     assert "condition 2" in sortie and ".claude/x" in sortie
-    etapes.append(("6b. fusion qui touche `.claude/x`", _decision(sortie)))
+    etapes.append(("6b. fusion qui touche `.claude/x`", sortie))
 
     # 7. `cime etat`
     etat = json.loads(_cime(projet, "assistant", "etat").stdout)["fusions_auto"]

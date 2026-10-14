@@ -1,6 +1,7 @@
-"""Fusions automatiques : la garde laisse l'Assistant fusionner une
-branche d'équipe sans accord par sha quand l'option est active et que les cinq conditions tiennent ;
-pour chacune, un test où elle seule est fausse. Dépôts git jetables sous tmp_path ; `CIME_PROJET` et
+"""Fusions automatiques : les règles de la garde permettent la fusion d'une branche d'équipe sans
+accord par sha quand l'option est active et que les cinq conditions tiennent ; pour chacune, un test
+où elle seule est fausse. L'Assistant ne lance plus `git merge` : ces règles sont jugées sur la
+référence, comme le fait `cime fusionner`. Dépôts git jetables sous tmp_path ; `CIME_PROJET` et
 `CIME_AGENT` posés dans les tests, jamais sur le vrai projet."""
 import json
 import os
@@ -11,7 +12,6 @@ import pytest
 
 from cime.fondation import fusions_auto, garde
 from cime.fondation.garde import decider, fusions_autorisees
-from cime.fondation.garde import fusions_detaillees
 from cime.fondation.registre import inscrire_message, ouvrir
 from test_garde_fusion import (MANIFESTE, _git, depot, donner_accord, entree, fusions, identite,  # noqa: F401
                                lancer, poste, sha_de)
@@ -65,7 +65,26 @@ def annoncer(depot, equipe="x", ref=None, sha=None, de="assistant", a="utilisate
         conn.close()
 
 
+def jugement(depot, *refs):
+    """Les règles de fusion appliquées à chaque référence, dans un même contexte ; renvoie le contexte
+    (voies, détails de la voie auto) et le premier motif de refus (None si toutes passent)."""
+    ctx = garde._Contexte({}, depot)
+    ctx.agent = "assistant"
+    try:
+        for ref in refs:
+            garde._juger_fusion(ctx, ref)
+    except garde._Refus as r:
+        return ctx, str(r)
+    return ctx, None
+
+
 def refus(depot, commande=MERGE):
+    """Le motif de refus des règles pour la dernière référence de `commande`, ou None."""
+    return jugement(depot, commande.split()[-1])[1]
+
+
+def refus_garde(depot, commande=MERGE):
+    """Le motif de la garde (le hook) pour la commande, tel que l'Assistant le reçoit."""
     return decider(entree(commande, depot), depot)
 
 
@@ -81,18 +100,18 @@ def pret(depot):
 # --- le cas qui passe -----------------------------------------------------------------------
 
 def test_fusion_eligible_avec_annonce_passe(pret):
-    e = entree(MERGE, pret)
-    assert decider(e, pret) is None
-    assert fusions_autorisees(e, pret) == ["equipe/x"]
-    [d] = fusions_detaillees(e, pret)
-    assert d["ref"] == "equipe/x" and d["voie"] == "auto" and d["equipe"] == "x"
-    assert d["sha"] == sha_de(pret, "equipe/x") and d["annonce"] == 1 and d["reglage"] == 1
-    assert d["fichiers"] == 0
+    ctx, motif = jugement(pret, "equipe/x")
+    assert motif is None and ctx.voies == {"equipe/x": "auto"}
+    d = ctx.auto["equipe/x"]
+    assert d["equipe"] == "x" and d["sha"] == sha_de(pret, "equipe/x")
+    assert d["annonce"] == 1 and d["reglage"] == 1 and d["fichiers"] == 0
 
 
-def test_options_de_merge_inchangees(pret):
-    for cmd in ('git merge --no-ff -m "x" equipe/x', "git -C {P} merge equipe/x"):
-        assert refus(pret, cmd.format(P=pret)) is None
+def test_la_garde_refuse_le_git_merge_meme_quand_les_regles_passent(pret):
+    assert refus(pret) is None
+    motif = refus_garde(pret)
+    assert motif is not None and "cime fusionner" in motif
+    assert fusions_autorisees(entree(MERGE, pret), pret) == []
 
 
 def test_annonce_avec_sha_abrege_a_sept_caracteres(depot):
@@ -205,7 +224,7 @@ def test_condition_2_un_chemin_voisin_n_est_pas_reserve(pret):
     branche(pret, "equipe/y", {"src/cime/fondation2/x.py": "1", "src/neuf.py": "2"})
     annoncer(pret, equipe="y", ref="equipe/y")
     assert refus(pret, "git merge equipe/y") is None
-    assert fusions_detaillees(entree("git merge equipe/y", pret), pret)[0]["fichiers"] == 2
+    assert jugement(pret, "equipe/y")[0].auto["equipe/y"]["fichiers"] == 2
 
 
 def test_condition_2_une_suppression_et_un_renommage_comptent(pret):
@@ -321,33 +340,29 @@ def test_le_message_nomme_la_premiere_condition_fausse_dans_l_ordre(pret):
 def test_l_accord_passe_en_premier_meme_quand_l_option_est_active(pret):
     branche(pret, "equipe/y", {".claude/x": "x"})                # inéligible à la voie auto
     donner_accord(pret, "equipe/y", equipe="y")
-    e = entree("git merge equipe/y", pret)
-    assert decider(e, pret) is None
-    assert [(d["ref"], d["voie"]) for d in fusions_detaillees(e, pret)] == [("equipe/y", "accord")]
+    ctx, motif = jugement(pret, "equipe/y")
+    assert motif is None and ctx.voies == {"equipe/y": "accord"}
 
 
 def test_un_accord_et_une_annonce_pour_la_meme_pointe_prennent_la_voie_accord(pret):
     donner_accord(pret)
-    assert fusions_detaillees(entree(MERGE, pret), pret)[0]["voie"] == "accord"
+    assert jugement(pret, "equipe/x")[0].voies == {"equipe/x": "accord"}
 
 
 def test_chaque_reference_est_jugee_separement_et_une_seule_refusee_refuse_tout(pret):
     branche(pret, "equipe/y", {"src/y.py": "1"})                  # éligible mais sans annonce
-    e = entree("git merge equipe/x equipe/y", pret)
-    motif = decider(e, pret)
+    ctx, motif = jugement(pret, "equipe/x", "equipe/y")
     assert motif is not None and "equipe/y" in motif and "condition 4" in motif
-    assert fusions_autorisees(e, pret) == []
     annoncer(pret, equipe="y", ref="equipe/y")
-    assert decider(e, pret) is None
-    assert [d["voie"] for d in fusions_detaillees(e, pret)] == ["auto", "auto"]
+    ctx, motif = jugement(pret, "equipe/x", "equipe/y")
+    assert motif is None and ctx.voies == {"equipe/x": "auto", "equipe/y": "auto"}
 
 
-def test_une_ref_par_accord_et_une_par_annonce_dans_une_commande(pret):
+def test_une_ref_par_accord_et_une_par_annonce(pret):
     branche(pret, "equipe/y", {".claude/x": "x"})
     donner_accord(pret, "equipe/y", equipe="y")
-    e = entree("git merge equipe/x equipe/y", pret)
-    assert decider(e, pret) is None
-    assert [d["voie"] for d in fusions_detaillees(e, pret)] == ["auto", "accord"]
+    ctx, motif = jugement(pret, "equipe/x", "equipe/y")
+    assert motif is None and ctx.voies == {"equipe/x": "auto", "equipe/y": "accord"}
 
 
 # --- les autres rôles et lieux : comportement actuel inchangé ---------------------------------
@@ -355,13 +370,13 @@ def test_une_ref_par_accord_et_une_par_annonce_dans_une_commande(pret):
 @pytest.mark.parametrize("nom", ["coord-fondation", "worker-fondation-x"])
 def test_coordinateur_et_worker_toujours_refuses_option_active(pret, monkeypatch, nom):
     identite(monkeypatch, nom)
-    motif = refus(pret)
+    motif = refus_garde(pret)
     assert "faite par l'Assistant" in motif
 
 
 def test_sans_identite_toujours_refuse_option_active(pret, monkeypatch):
     identite(monkeypatch, None)
-    assert "réservé à l'utilisateur" in refus(pret)
+    assert "réservé à l'utilisateur" in refus_garde(pret)
 
 
 def test_assistant_hors_depot_principal_inchange(pret, tmp_path):
@@ -378,7 +393,7 @@ def test_assistant_hors_depot_principal_inchange(pret, tmp_path):
 def test_push_et_suppression_de_branche_toujours_refuses_option_active(pret):
     for cmd in ("git push", "git push origin main", "git branch -D equipe/x", "git rebase main",
                 "git merge", "git reset --hard HEAD~1", "git update-ref refs/heads/main equipe/x"):
-        assert refus(pret, cmd) is not None, cmd
+        assert refus_garde(pret, cmd) is not None, cmd
 
 
 # --- erreurs : jamais un laissez-passer ------------------------------------------------------
@@ -475,116 +490,3 @@ def test_liste_du_manifeste_mal_formee_vaut_refus_condition_2(pret):
 
 def test_ref_qui_ne_se_resout_pas_vaut_refus(pret):
     assert refus(pret, "git merge equipe/fantome") is not None
-
-
-# --- PostToolUse : le journal, une seule fois, aucun accord consommé --------------------------
-
-def lignes_journal(depot):
-    conn = sqlite3.connect(depot / ".orga" / "etat" / "registre.sqlite")
-    try:
-        return conn.execute("SELECT auteur, action, cible, details, resultat FROM journal"
-                            " WHERE action = 'fusion_auto' ORDER BY id").fetchall()
-    finally:
-        conn.close()
-
-
-def fusionner(monkeypatch, capsys, depot, commande="git merge --no-ff -m x equipe/x"):
-    assert lancer(monkeypatch, capsys, commande, "assistant") == ""
-    _git("merge", "--no-ff", "-m", "x", commande.split()[-1], cwd=depot)
-    return commande
-
-
-def test_post_tool_use_journalise_la_fusion_auto_une_seule_fois(pret, monkeypatch, capsys):
-    branche(pret, "equipe/y", {"a.txt": "1", "b.txt": "2"})
-    annoncer(pret, equipe="y", ref="equipe/y")
-    sha = sha_de(pret, "equipe/y")
-    cmd = fusionner(monkeypatch, capsys, pret, "git merge --no-ff -m x equipe/y")
-    assert poste(monkeypatch, capsys, cmd, "assistant") == ""
-    [(auteur, action, cible, details, resultat)] = lignes_journal(pret)
-    assert (auteur, action, cible, resultat) == ("assistant", "fusion_auto", f"fusion:y:{sha}", "ok")
-    assert json.loads(details) == {"annonce": 2, "reglage": 1, "fichiers": 2}
-    # fusions.log complet : l'intention puis le résultat
-    intention, resultat = fusions(pret)
-    assert intention.split(" ")[2:4] == [sha, "equipe/y"] and resultat.endswith("resultat=fusionne")
-    # PostToolUse rejoué (la branche est maintenant ancêtre de HEAD) : pas de seconde ligne
-    poste(monkeypatch, capsys, cmd, "assistant")
-    assert len(lignes_journal(pret)) == 1
-
-
-def test_la_voie_auto_est_reconnue_apres_la_fusion(pret, monkeypatch, capsys):
-    cmd = fusionner(monkeypatch, capsys, pret)
-    e = entree(cmd, pret)
-    assert decider(e, pret) is None
-    [d] = fusions_detaillees(e, pret)
-    assert d["voie"] == "auto" and d["fichiers"] == 0     # différence vide : la branche est dans HEAD
-
-
-def test_une_fusion_auto_ne_consomme_aucun_accord(pret, monkeypatch, capsys):
-    autre = donner_accord(pret, "equipe/x", sha="f" * 40)          # accord d'une autre fusion (autre pointe)
-    cmd = fusionner(monkeypatch, capsys, pret)
-    poste(monkeypatch, capsys, cmd, "assistant")
-    conn = sqlite3.connect(pret / ".orga" / "etat" / "registre.sqlite")
-    try:
-        clos = conn.execute("SELECT message_id FROM transitions WHERE etat = 'clos'").fetchall()
-    finally:
-        conn.close()
-    assert clos == []                                              # rien n'est consommé : ni lui, ni un autre
-    assert autre not in [c[0] for c in clos]
-    assert len(lignes_journal(pret)) == 1
-
-
-def test_le_hook_ne_consomme_pas_d_accord_pour_une_fusion_auto(pret, monkeypatch, capsys):
-    """Même si un accord vise exactement cette pointe (donné entre l'autorisation et le PostToolUse),
-    une fusion que la garde a laissée passer par la voie auto n'en consomme aucun."""
-    sha = sha_de(pret, "equipe/x")
-    accord = donner_accord(pret)
-    cmd = fusionner(monkeypatch, capsys, pret)
-    monkeypatch.setattr(garde, "fusions_detaillees", lambda e, p: [
-        {"ref": "equipe/x", "voie": "auto", "equipe": "x", "sha": sha, "annonce": 1,
-         "reglage": 1, "fichiers": 0}])
-    poste(monkeypatch, capsys, cmd, "assistant")
-    conn = sqlite3.connect(pret / ".orga" / "etat" / "registre.sqlite")
-    try:
-        clos = conn.execute("SELECT 1 FROM transitions WHERE etat = 'clos' AND message_id = ?",
-                            (accord,)).fetchall()
-    finally:
-        conn.close()
-    assert clos == []
-    assert len(lignes_journal(pret)) == 1
-
-
-def test_une_fusion_par_accord_consomme_son_accord_et_n_ecrit_pas_de_ligne_auto(pret, monkeypatch, capsys):
-    accord = donner_accord(pret)
-    cmd = fusionner(monkeypatch, capsys, pret)
-    poste(monkeypatch, capsys, cmd, "assistant")
-    conn = sqlite3.connect(pret / ".orga" / "etat" / "registre.sqlite")
-    try:
-        clos = conn.execute("SELECT message_id FROM transitions WHERE etat = 'clos' AND message_id = ?",
-                            (accord,)).fetchall()
-    finally:
-        conn.close()
-    assert clos == [(accord,)]
-    assert lignes_journal(pret) == []
-    assert not (pret / ".orga" / "etat" / "hooks-erreurs.log").exists()
-
-
-def test_echec_d_ecriture_du_journal_va_dans_hooks_erreurs_et_ne_fait_pas_echouer(pret, monkeypatch, capsys):
-    conn = ouvrir(pret)
-    with conn:
-        conn.execute("CREATE TRIGGER pas_de_fusion_auto BEFORE INSERT ON journal"
-                     " BEGIN SELECT RAISE(ABORT, 'journal ferme'); END")
-    conn.close()
-    cmd = fusionner(monkeypatch, capsys, pret)
-    assert poste(monkeypatch, capsys, cmd, "assistant") == ""
-    erreurs = (pret / ".orga" / "etat" / "hooks-erreurs.log").read_text(encoding="utf-8")
-    assert "PostToolUse" in erreurs and "journal ferme" in erreurs
-    assert lignes_journal(pret) == []
-    assert fusions(pret)[-1].endswith("resultat=fusionne")          # fusions.log complet malgré tout
-
-
-def test_fusion_non_faite_pas_de_ligne_journal(pret, monkeypatch, capsys):
-    cmd = MERGE
-    lancer(monkeypatch, capsys, cmd, "assistant")
-    poste(monkeypatch, capsys, cmd, "assistant")                     # la commande n'a rien fusionné
-    assert fusions(pret)[-1].endswith("resultat=non-fusionne")
-    assert lignes_journal(pret) == []

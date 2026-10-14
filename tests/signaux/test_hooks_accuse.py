@@ -10,7 +10,7 @@ from aide import fabriquer_projet
 from cime.fondation import hook
 from cime.fondation.nom import VAR_AGENT, VAR_PROJET
 from cime.fondation.registre import etat_message, ouvrir
-from cime.signaux import commandes, courrier
+from cime.signaux import commandes, courrier, hooks
 
 WORKER = "worker-x-tache"
 
@@ -128,6 +128,24 @@ def test_prompt_sans_motif_ne_fait_rien(projet, monkeypatch, capsys, prompt):
     livrer_par_tmux(projet, WORKER)
     lancer(monkeypatch, capsys, "UserPromptSubmit", WORKER, {"prompt": prompt})
     assert etat(projet, m) == "livre"
+
+
+@pytest.mark.parametrize("de,equipe,prefixe", [
+    ("utilisateur", None, "Utilisateur : "),
+    ("assistant", None, "Assistant : "),
+    ("cime", None, "Cime : "),
+    ("coord-x", None, "coordinateur x : "),
+    ("worker-x-t", "x", "worker x/t : "),
+    ("worker-mon-eq-tache-1", "mon-eq", "worker mon-eq/tache-1 : "),
+    ("worker-alpha", None, "worker alpha : "),
+])
+def test_chaque_emetteur_rendu_par_emetteur_lisible_est_reconnu_par_le_prefixe(tmp_path, de, equipe, prefixe):
+    """Le texte tapé par le facteur pour un message de cet émetteur commence par le préfixe attendu :
+    le préfixe est lu depuis les mêmes mots que `emetteur_lisible`, et chaque mot est épinglé ici."""
+    m = {"id": 7, "de": de, "equipe": equipe, "corps": None, "resume": "va"}
+    texte = courrier.formater(None, courrier.Courrier(1, WORKER, "tmux", 1, [m]), "tmux", tmp_path)
+    assert texte.startswith(prefixe)
+    assert hooks._PREFIXE.match(texte), texte
 
 
 def test_livraison_par_hook_n_est_pas_accusee_par_prompt(projet, monkeypatch, capsys):

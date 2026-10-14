@@ -55,6 +55,13 @@ M_FUSION = ("`git {sub}` sur la branche de référence ou dans le dépôt princi
 M_FUSION_MERGE = ("la fusion sur la branche de référence est faite par l'Assistant, avec "
                   "l'accord de l'utilisateur : demande-la-lui par le canal écrit habituel "
                   "(`git -C <worktree> merge …` reste permis dans ton worktree).")
+M_FILE = ("`git {sub}` écrit la branche de référence sans passer par la file de fusion, qui lance "
+          "la suite entière avant chaque fusion : utilise `cime fusionner <équipe>` (la mise à "
+          "jour d'une branche d'équipe avec la référence reste `git -C <worktree> merge …`).")
+M_COMMIT_FUSION = ("`git commit` pendant une fusion en cours sur la branche de référence achèverait "
+                   "une fusion hors de la file : utilise `cime fusionner <équipe>`.")
+M_COMMIT_REECRIT = ("`git commit --amend` sur la branche de référence en réécrit la pointe hors de "
+                    "la file de fusion : fais un nouveau commit.")
 M_FUSION_SANS_CIBLE = ("`git merge` sans branche donnée : l'Assistant ne fusionne qu'une "
                        "branche nommée (`git merge <branche>`), pour que le journal la trace.")
 M_REF =(f"modifier la branche de référence est réservé à l'utilisateur : {_SUPERIEUR}.")
@@ -71,6 +78,8 @@ M_LANCER_COORD = (f"tu ne lances que les workers de ton équipe : `{NOM} lancer 
                   f"équipes se lancent par l'Assistant, à qui tu écris par `{NOM} envoyer`.")
 M_LANCER_INTEGRATION = (f"le worker d'intégration est lancé par l'Assistant seul : demande-le à l'Assistant "
                         f"(`{NOM} envoyer --a assistant --nature question --objet integration:{{equipe}}`).")
+M_FUSIONNER = (f"tu ne fusionnes rien : `{NOM} fusionner` est refusé à ton rôle. La fusion se "
+               f"demande à l'Assistant (`{NOM} envoyer`).")
 M_CIME_OPTION = (f"option avant la sous-commande de `{NOM}` : refusée à ton rôle, on ne "
                  f"peut pas savoir si c'est un `lancer`. Forme attendue : `{NOM} <sous-commande> "
                  f"--help` (ou `{NOM} <sous-commande> <options>`).")
@@ -121,11 +130,13 @@ _MOTS_CLES = {"if", "then", "else", "elif", "fi", "do", "done", "while", "until"
 _SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
 _INTERPRETE = re.compile(r"^(python[\d.]*|perl|ruby|node|osascript|php)$")
 _FUSION = {"merge", "pull", "rebase", "cherry-pick", "am", "reset", "checkout", "switch"}
+# ce qui écrit la branche de référence : à l'Assistant, la file de fusion répond
+_FUSION_PAR_LA_FILE = {"merge", "pull", "rebase", "cherry-pick", "am", "reset"}
 ASSISTANT = "assistant"  # identité de l'Assistant (`cime lancer assistant`)
 # options de `git merge` qui prennent une valeur au mot suivant
 _MERGE_VALEUR = {"-m", "-s", "-X", "-F", "--message", "--strategy", "--strategy-option",
                  "--into-name", "--cleanup", "--file"}
-_MERGE_CONTINUITE = {"--abort", "--continue", "--quit"}  # ne fusionnent rien de nouveau
+_MERGE_CONTINUITE = {"--abort", "--quit"}  # ne fusionnent rien ; `--continue` achève une fusion
 
 
 # descripteur collé à sa redirection (`2>&1`, `1>f`, `0<f`) : début de mot, chiffres, `>` ou `<`
@@ -1042,22 +1053,50 @@ def _supprime_une_branche(reste: list[str]) -> bool:
     return False
 
 
+def _options_branch(reste: list[str]) -> tuple[bool, bool]:
+    """(force, déplace) de `git branch` : `-f`, `-M`, `-C` (groupés ou non) et `--force` (abrégé) écrasent
+    une branche ; `-m`, `-M` et `--move` (abrégé) la renomment."""
+    force = deplace = False
+    for a in reste:
+        if a == "--":
+            break
+        if a.startswith("--"):
+            nom = a.split("=", 1)[0]
+            force = force or (len(nom) >= 3 and "--force".startswith(nom))
+            deplace = deplace or (len(nom) >= 4 and "--move".startswith(nom))
+        elif a.startswith("-") and a != "-":
+            force = force or any(c in "fMC" for c in a[1:])
+            deplace = deplace or any(c in "mM" for c in a[1:])
+    return force, deplace
+
+
+def _sans_valeur_de_m(reste: list[str]) -> list[str]:
+    """`reste` sans la valeur qui suit `-m` (le message de `git update-ref -m <msg> <ref> …`)."""
+    return [a for k, a in enumerate(reste) if not (k and reste[k - 1] == "-m")]
+
+
 def _git_sous_commande(sub, reste, cwd, env, opts_git, ctx, prof):
     if sub in ("push", "send-pack") or (sub in ("subtree", "lfs") and "push" in reste):
         raise _Refus(M_PUSH)
     if sub == "branch":
         if _supprime_une_branche(reste):
             raise _Refus(M_BRANCHE)
-        if any(a in ("-f", "--force") for a in reste) and \
-                set(_positionnels(reste)) & ctx.refs:
-            raise _Refus(M_REF)
-    elif sub == "update-ref":
         pos = _positionnels(reste)
+        force, deplace = _options_branch(reste)
+        if force and set(pos) & ctx.refs:
+            raise _Refus(M_REF)
+        if deplace and (pos[:1] and pos[0] in ctx.refs or
+                        len(pos) == 1 and _depot_principal(cwd, env, opts_git, ctx)):
+            raise _Refus(M_REF)   # renommer la référence libère son nom pour une création ordinaire
+    elif sub == "update-ref":
+        pos = _positionnels(_sans_valeur_de_m(reste))
         if "--stdin" in reste:
             raise _Refus(M_BRANCHE)
         if "-d" in reste and any(p.startswith("refs/heads/") for p in pos):
             raise _Refus(M_BRANCHE)
         if pos and pos[0] in {f"refs/heads/{r}" for r in ctx.refs}:
+            raise _Refus(M_REF)
+        if pos and pos[0] == "HEAD" and _depot_principal(cwd, env, opts_git, ctx):
             raise _Refus(M_REF)
     elif sub == "fetch":
         for p in _positionnels(reste):
@@ -1087,13 +1126,13 @@ def _git_sous_commande(sub, reste, cwd, env, opts_git, ctx, prof):
                 _analyser(reste[k + 1], cwd, ctx, prof + 1)
     if sub in _FUSION:
         _fusion(sub, reste, cwd, env, opts_git, ctx)
+    if sub == "commit":
+        _commit(reste, cwd, env, opts_git, ctx)
     if (ctx.agent or "").startswith("coord-"):
         _coordinateur(sub, reste, cwd, env, opts_git, ctx)
 
 
 def _fusion(sub, reste, cwd, env, opts_git, ctx):
-    if sub == "reset" and not any(len(a) >= 4 and "--hard".startswith(a) for a in reste):
-        return
     if sub in ("checkout", "switch") and not set(_positionnels(reste)) & ctx.refs:
         return
     if cwd is _INCONNU and not opts_git:
@@ -1103,24 +1142,70 @@ def _fusion(sub, reste, cwd, env, opts_git, ctx):
         _cible_merge(cwd, env, opts_git, ctx)
     if not _depot_principal(cwd, env, opts_git, ctx):
         return
-    if sub == "merge" and ctx.agent == ASSISTANT:
-        # seul cas permis dans le dépôt principal : la fusion nommée, journalisée au hook
-        refs = _refs_merge(reste)
-        for ref in refs:   # chaque référence est jugée séparément : une seule refusée, tout l'est
-            motif = _motif_accord_fusion(ctx, ref)
-            if motif is None:
-                ctx.voies[ref] = "accord"
-                continue
-            auto, complement = _voie_auto(ctx, ref)
-            if auto is None:
-                raise _Refus(motif + complement)
-            ctx.voies[ref] = "auto"
-            ctx.auto[ref] = auto
-        ctx.fusions.extend(refs)
-        return
+    if sub == "merge" and ctx.agent == ASSISTANT and _MERGE_CONTINUITE & set(reste):
+        return   # abandonner une fusion ne fusionne rien
+    if ctx.agent == ASSISTANT and sub in _FUSION_PAR_LA_FILE:
+        raise _Refus(M_FILE.format(sub=sub))
     if sub == "merge" and _role(ctx):
         raise _Refus(M_FUSION_MERGE)
     raise _Refus(M_FUSION.format(sub=sub))
+
+
+def _commit(reste, cwd, env, opts_git, ctx) -> None:
+    """`git commit` dans le dépôt principal : ordinaire permis ; refusé s'il réécrit la pointe de la
+    référence (`--amend`) ou s'il achève une fusion en cours (`MERGE_HEAD`)."""
+    amende = _option_commit_interdite(reste, ("--amend",)) is not None
+    if cwd is _INCONNU and not opts_git:
+        if amende:
+            raise _Refus(M_INCONNU.format(sub="commit"))
+        return
+    gitdir, branche = _etat_depot(cwd, _env_effectif(env), opts_git)
+    if gitdir is None:
+        if amende:
+            raise _Refus(M_INCONNU.format(sub="commit"))
+        return
+    if not _depot_principal(cwd, env, opts_git, ctx):
+        return
+    if amende and branche in ctx.refs:
+        raise _Refus(M_COMMIT_REECRIT)
+    if (gitdir / "MERGE_HEAD").exists():
+        raise _Refus(M_COMMIT_FUSION)
+
+
+def _juger_fusion(ctx, ref: str, sans_annonce: bool = False, sha: str | None = None) -> None:
+    """La voie de la fusion de `ref` (inscrite dans `ctx.voies`, et `ctx.auto` pour "auto"), ou
+    `_Refus` avec ce qui manque. `sha` : la pointe déjà figée par l'appelant, jugée à la place de
+    celle que `ref` désigne maintenant."""
+    motif = _motif_accord_fusion(ctx, ref, sha)
+    if motif is None:
+        ctx.voies[ref] = "accord"
+        return
+    auto, complement = _voie_auto(ctx, ref, sans_annonce, sha)
+    if auto is None:
+        raise _Refus(motif + complement)
+    ctx.voies[ref] = "auto"
+    ctx.auto[ref] = auto
+
+
+def juger_fusion(projet: Path, ref: str, sha: str | None = None) -> tuple[str | None, dict, str | None]:
+    """Les règles qui s'appliquent à un `git merge <ref>` de l'Assistant, pour une commande qui
+    fusionne elle-même : `(voie, détails, None)` si la fusion est permise, `(None, {}, motif)` sinon.
+    `voie` : "accord" (un accord de l'utilisateur non consommé vise la pointe) ou "auto" (option
+    « Fusions automatiques ») ; pour "auto", `détails` porte `equipe`, `sha`, `reglage`, `fichiers`
+    et `annonce` à None : la commande l'inscrit elle-même, juste avant de fusionner. `sha` : la
+    pointe de `ref` figée par l'appelant, jugée même si la branche a avancé depuis. Ne consomme
+    rien. Ne lève jamais : toute erreur de lecture est un refus."""
+    try:
+        ctx = _Contexte({}, projet)
+        ctx.agent = ASSISTANT
+        if ctx.projet is None:
+            return None, {}, "le projet n'est pas lisible"
+        _juger_fusion(ctx, ref, sans_annonce=True, sha=sha)
+        return ctx.voies[ref], dict(ctx.auto.get(ref, {})), None
+    except _Refus as r:
+        return None, {}, str(r)
+    except Exception as e:
+        return None, {}, f"les règles de fusion ne se lisent pas ({type(e).__name__} : {e})"
 
 
 _HISTOIRE_COORD = {"checkout", "switch", "stash", "restore", "reset"}
@@ -1128,20 +1213,22 @@ _HISTOIRE_COORD = {"checkout", "switch", "stash", "restore", "reset"}
 _COMMIT_VALEUR = set("mFcCtSu")
 
 
-def _option_commit_interdite(reste: list[str]) -> str | None:
-    """`--amend` ou `--no-verify` (sous toutes leurs abréviations, `-n` compris) dans un `git commit`."""
+def _option_commit_interdite(reste: list[str],
+                             cherche: tuple = ("--amend", "--no-verify")) -> str | None:
+    """`--amend` ou `--no-verify` (sous toutes leurs abréviations, `-n` compris) dans un `git commit` ;
+    `cherche` restreint aux options demandées."""
     for a in reste:
         if a == "--":
             break
         if a.startswith("--"):
             nom = a.split("=", 1)[0]
-            if len(nom) >= 4 and "--amend".startswith(nom):
+            if "--amend" in cherche and len(nom) >= 4 and "--amend".startswith(nom):
                 return "--amend"
-            if len(nom) >= 6 and "--no-verify".startswith(nom):
+            if "--no-verify" in cherche and len(nom) >= 6 and "--no-verify".startswith(nom):
                 return "--no-verify"
         elif a.startswith("-") and a != "-":
             for c in a[1:]:
-                if c == "n":
+                if c == "n" and "--no-verify" in cherche:
                     return "--no-verify"
                 if c in _COMMIT_VALEUR:
                     break
@@ -1377,9 +1464,10 @@ def accord_pour(sha: str, libres: list[tuple[int, str]]) -> int | None:
     return next((i for i, a in libres if len(a) >= 7 and sha.startswith(a)), None)
 
 
-def _motif_accord_fusion(ctx, ref: str) -> str | None:
-    """None si un accord de l'utilisateur non consommé vise la pointe actuelle de `ref`."""
-    sha = _sha_pointe(ctx, ref)
+def _motif_accord_fusion(ctx, ref: str, sha_fige: str | None = None) -> str | None:
+    """None si un accord de l'utilisateur non consommé vise la pointe actuelle de `ref` (ou
+    `sha_fige`, quand l'appelant l'a figée)."""
+    sha = sha_fige or _sha_pointe(ctx, ref)
     if sha is None:
         return M_ACCORD_FUSION.format(ref=ref, sha="?", sha_complet="<sha>",
                                       cause="la branche ne se résout pas dans le dépôt principal")
@@ -1454,10 +1542,13 @@ def _annonce(ctx, equipe: str, sha: str) -> int | None:
     return None
 
 
-def _voie_auto(ctx, ref: str) -> tuple[dict | None, str]:
+def _voie_auto(ctx, ref: str, sans_annonce: bool = False,
+               sha_fige: str | None = None) -> tuple[dict | None, str]:
     """(détails, "") si la fusion de `ref` passe par l'option « Fusions automatiques » ; sinon
     (None, complément du message de refus) — "" quand l'option n'est pas active. Jamais de
-    laissez-passer sur erreur."""
+    laissez-passer sur erreur. `sans_annonce` : la condition 4 est laissée à l'appelant, qui
+    annonce lui-même la fusion juste avant de la faire (`annonce` vaut alors None). `sha_fige` :
+    la pointe jugée, à la place de celle de la branche d'aujourd'hui."""
     if ctx.projet is None or ctx.manifeste is None:
         return None, ""
     etat = fusions_auto.etat_courant(ctx.projet)
@@ -1471,17 +1562,19 @@ def _voie_auto(ctx, ref: str) -> tuple[dict | None, str]:
                 raise _EchecAuto(1, f"{ref} n'est pas une branche d'équipe "
                                     f"({ctx.manifeste.branche_equipe})")
             sha = _sha_pointe(ctx, f"refs/heads/{ref}")
-            if sha is None or sha != _sha_pointe(ctx, ref):
+            if sha is None or (sha_fige is None and sha != _sha_pointe(ctx, ref)):
                 raise _EchecAuto(1, f"{ref} ne désigne pas, sans ambiguïté, la branche de ce nom")
+            sha = sha_fige or sha
+            cible = sha_fige or ref
         with _condition(2):
             actuelle = fusions_auto.chemins_reserves(ctx.projet)
             liste = actuelle + [e for e in etat["reserves"] if e not in actuelle]
             reference = ctx.manifeste.branche_reference
-            base = _git_auto(ctx, "merge-base", reference, ref)
+            base = _git_auto(ctx, "merge-base", reference, cible)
             if base.returncode != 0 or not base.stdout.strip():
                 raise _EchecAuto(2, "aucune base commune avec la branche de référence")
             diff = _git_auto(ctx, "diff", "--name-only", "--no-renames", "-z",
-                             base.stdout.strip(), ref)
+                             base.stdout.strip(), cible)
             if diff.returncode != 0:
                 raise _EchecAuto(2, "la différence ne se calcule pas")
             fichiers = [c for c in diff.stdout.split("\0") if c]
@@ -1493,12 +1586,12 @@ def _voie_auto(ctx, ref: str) -> tuple[dict | None, str]:
             tete = _git_auto(ctx, "symbolic-ref", "--short", "HEAD")
             if tete.returncode != 0 or tete.stdout.strip() != reference:
                 raise _EchecAuto(3, f"le dépôt principal n'est pas sur {reference}")
-            essai = _git_auto(ctx, "merge-tree", "--write-tree", reference, ref)
+            essai = _git_auto(ctx, "merge-tree", "--write-tree", reference, cible)
             if essai.returncode != 0:
                 raise _EchecAuto(3, "la fusion a des conflits (ou l'essai échoue)")
         with _condition(4):
-            annonce = _annonce(ctx, equipe, sha)
-            if annonce is None:
+            annonce = None if sans_annonce else _annonce(ctx, equipe, sha)
+            if annonce is None and not sans_annonce:
                 raise _EchecAuto(4, f"aucun rapport_utilisateur de l'Assistant "
                                     f"`fusion-auto:{equipe}:{sha[:10]}` pour cette pointe")
         with _condition(5):
@@ -1575,6 +1668,8 @@ def _verifier_cime(args: list[str], ctx) -> None:
         return
     if args[0].startswith("-"):  # sous-commande pas trouvée avec certitude
         raise _Refus(M_CIME_OPTION)
+    if args[0] == "fusionner":
+        raise _Refus(M_FUSIONNER)
     if args[0] != "lancer":
         return
     if role == "worker":

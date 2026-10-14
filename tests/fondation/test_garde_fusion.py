@@ -98,7 +98,7 @@ def accord_x(depot):
     return donner_accord(depot)
 
 
-ASSISTANT_PERMIS = [
+ASSISTANT_FUSIONNE_A_LA_MAIN = [
     "git merge equipe/x",
     "git -C {P} merge equipe/x",
     'git merge --no-ff -m "x" equipe/x',
@@ -120,11 +120,14 @@ ASSISTANT_REFUSE = [
 ]
 
 
-@pytest.mark.parametrize("commande", ASSISTANT_PERMIS)
-def test_assistant_fusionne(depot, accord_x, monkeypatch, commande):
+@pytest.mark.parametrize("commande", ASSISTANT_FUSIONNE_A_LA_MAIN)
+def test_assistant_ne_fusionne_plus_a_la_main_meme_avec_accord(depot, accord_x, monkeypatch, commande):
+    """La fusion vers la référence passe par `cime fusionner` : l'accord n'y change rien."""
     identite(monkeypatch, "assistant")
     cmd = commande.format(P=depot)
-    assert decider(entree(cmd, depot), depot) is None
+    motif = decider(entree(cmd, depot), depot)
+    assert motif is not None and "cime fusionner" in motif
+    assert fusions_autorisees(entree(cmd, depot), depot) == []
 
 
 @pytest.mark.parametrize("commande", ASSISTANT_REFUSE)
@@ -168,23 +171,13 @@ def test_identite_qui_ressemble_refusee(depot, monkeypatch, nom):
 def test_merge_sans_branche_nommee_refusee_a_l_assistant(depot, monkeypatch):
     identite(monkeypatch, "assistant")
     motif = decider(entree("git merge", depot), depot)
-    assert "branche nommée" in motif
+    assert "cime fusionner" in motif
 
 
 def test_abort_permis_sans_fusion_journalisee(depot, monkeypatch):
     identite(monkeypatch, "assistant")
     assert decider(entree("git merge --abort", depot), depot) is None
     assert fusions_autorisees(entree("git merge --abort", depot), depot) == []
-
-
-def test_refs_extraites_des_options(depot, monkeypatch):
-    _git("branch", "equipe/y", "equipe/x", cwd=depot)
-    donner_accord(depot, "equipe/x")
-    donner_accord(depot, "equipe/y", equipe="y")
-    identite(monkeypatch, "assistant")
-    e = entree('git merge -s ort -X ours --no-ff -m "msg" equipe/x equipe/y', depot)
-    assert decider(e, depot) is None
-    assert fusions_autorisees(e, depot) == ["equipe/x", "equipe/y"]
 
 
 def test_fusions_autorisees_vide_pour_les_autres(depot, monkeypatch):
@@ -222,41 +215,6 @@ def sha(depot, ref):
                           text=True, check=True).stdout.strip()
 
 
-def test_journal_fusion_de_l_assistant(depot, accord_x, monkeypatch, capsys):
-    cmd = "git merge --no-ff -m x equipe/x"
-    assert lancer(monkeypatch, capsys, cmd, "assistant") == ""
-    (ligne,) = fusions(depot)
-    assert LIGNE_FUSIONS.match(ligne), ligne
-    horo, auteur, commit, ref, *reste = ligne.split(" ")
-    assert auteur == "assistant"
-    assert commit == sha(depot, "equipe/x")
-    assert ref == "equipe/x"
-    assert " ".join(reste) == cmd
-
-
-def test_journal_une_ligne_par_reference(depot, monkeypatch, capsys):
-    _git("branch", "equipe/y", "equipe/x", cwd=depot)
-    donner_accord(depot, "equipe/x")
-    donner_accord(depot, "equipe/y", equipe="y")
-    lancer(monkeypatch, capsys, "git merge equipe/x equipe/y", "assistant")
-    lignes = fusions(depot)
-    assert [li.split(" ")[3] for li in lignes] == ["equipe/x", "equipe/y"]
-    assert lignes[1].split(" ")[2] == sha(depot, "equipe/y")
-
-
-def test_reference_introuvable_refusee_et_rien_n_est_journalise(depot, monkeypatch, capsys):
-    sortie = lancer(monkeypatch, capsys, "git merge nexistepas", "assistant")
-    assert "permissionDecision" in sortie and "ne se résout pas" in sortie
-    assert fusions(depot) is None
-
-
-def test_commande_tronquee_a_300(depot, accord_x, monkeypatch, capsys):
-    cmd = "git merge --no-ff -m '" + "a" * 400 + "' equipe/x"
-    lancer(monkeypatch, capsys, cmd, "assistant")
-    (ligne,) = fusions(depot)
-    assert ligne.split(" ", 4)[4] == cmd[:300]
-
-
 def test_refus_du_coordinateur_pas_de_journal_fusion(depot, monkeypatch, capsys):
     sortie = lancer(monkeypatch, capsys, "git merge equipe/x", "coord-fondation")
     assert "permissionDecision" in sortie
@@ -275,13 +233,6 @@ def test_commande_qui_n_est_pas_une_fusion_n_ecrit_rien(depot, monkeypatch, caps
     assert fusions(depot) is None
 
 
-def test_echec_d_ecriture_journalise_et_fusion_passe(depot, accord_x, monkeypatch, capsys):
-    (depot / ".orga" / "etat" / "fusions.log").mkdir(parents=True)  # un dossier : pas écrivable
-    assert lancer(monkeypatch, capsys, "git merge equipe/x", "assistant") == ""
-    erreurs = (depot / ".orga" / "etat" / "hooks-erreurs.log").read_text(encoding="utf-8")
-    assert "PreToolUse" in erreurs
-
-
 # --- résultat de la fusion (PostToolUse) ----------------------------------
 
 def poste(monkeypatch, capsys, commande, agent):
@@ -290,24 +241,6 @@ def poste(monkeypatch, capsys, commande, agent):
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(evenement)))
     assert hook.executer(argparse.Namespace(evenement="PostToolUse")) == 0
     return capsys.readouterr().out
-
-
-def test_resultat_fusionne_apres_une_vraie_fusion(depot, accord_x, monkeypatch, capsys):
-    cmd = "git merge --no-ff -m x equipe/x"
-    lancer(monkeypatch, capsys, cmd, "assistant")
-    _git("merge", "--no-ff", "-m", "x", "equipe/x", cwd=depot)
-    assert poste(monkeypatch, capsys, cmd, "assistant") == ""
-    intention, resultat = fusions(depot)
-    assert intention.split(" ")[2] == sha(depot, "equipe/x")
-    assert resultat.split(" ")[2:4] == [sha(depot, "equipe/x"), "equipe/x"]
-    assert resultat.endswith(" resultat=fusionne")
-
-
-def test_resultat_non_fusionne_si_la_branche_n_est_pas_dans_main(depot, accord_x, monkeypatch, capsys):
-    cmd = "git merge equipe/x"
-    lancer(monkeypatch, capsys, cmd, "assistant")
-    poste(monkeypatch, capsys, cmd, "assistant")
-    assert fusions(depot)[-1].endswith(" resultat=non-fusionne")
 
 
 def test_reference_non_resolue_pas_de_resultat(depot, monkeypatch, capsys):
@@ -324,17 +257,6 @@ def test_post_tool_use_sur_une_commande_qui_n_est_pas_une_fusion_n_ecrit_rien(
 def test_post_tool_use_du_coordinateur_n_ecrit_rien(depot, monkeypatch, capsys):
     assert poste(monkeypatch, capsys, "git merge equipe/x", "coord-fondation") == ""
     assert fusions(depot) is None
-
-
-def test_echec_d_ecriture_du_resultat_journalise(depot, accord_x, monkeypatch, capsys):
-    cmd = "git merge --no-ff -m x equipe/x"
-    lancer(monkeypatch, capsys, cmd, "assistant")
-    _git("merge", "--no-ff", "-m", "x", "equipe/x", cwd=depot)
-    (depot / ".orga" / "etat" / "fusions.log").unlink()
-    (depot / ".orga" / "etat" / "fusions.log").mkdir()
-    assert poste(monkeypatch, capsys, cmd, "assistant") == ""
-    erreurs = (depot / ".orga" / "etat" / "hooks-erreurs.log").read_text(encoding="utf-8")
-    assert "PostToolUse" in erreurs
 
 
 # --- dépôt non résolu et dépôt détourné : refus pour tous ----------------
@@ -380,11 +302,12 @@ def test_git_dir_dans_l_environnement_de_l_agent_refuse(depot, monkeypatch, tmp_
     assert decider(entree("git merge equipe/x", depot), depot) is not None
 
 
-def test_git_dir_du_depot_principal_reste_permis_a_l_assistant(depot, accord_x, monkeypatch):
+def test_git_dir_du_depot_principal_ne_contourne_pas_la_file(depot, accord_x, monkeypatch):
     identite(monkeypatch, "assistant")
     cmd = f"GIT_DIR={depot}/.git git merge --no-ff -m x equipe/x"
-    assert decider(entree(cmd, depot), depot) is None
-    assert fusions_autorisees(entree(cmd, depot), depot) == ["equipe/x"]
+    motif = decider(entree(cmd, depot), depot)
+    assert motif is not None and "cime fusionner" in motif
+    assert fusions_autorisees(entree(cmd, depot), depot) == []
 
 
 # --- l'accord de l'utilisateur ---------------------------------------------------------------
@@ -392,43 +315,42 @@ def test_git_dir_du_depot_principal_reste_permis_a_l_assistant(depot, accord_x, 
 CMD = "git merge --no-ff -m x equipe/x"
 
 
-def test_sans_accord_refus_avec_la_commande_a_utiliser(depot, monkeypatch):
-    identite(monkeypatch, "assistant")
-    motif = decider(entree("git merge equipe/x", depot), depot)
+def refuse(depot, ref="equipe/x"):
+    """Le motif de refus des règles de fusion pour `ref` (celles que `cime fusionner` applique), ou None."""
+    return garde.juger_fusion(depot, ref)[2]
+
+
+def test_sans_accord_refus_avec_la_commande_a_utiliser(depot):
+    motif = refuse(depot)
     assert motif is not None and "aucun accord de l'utilisateur non consommé" in motif
     assert "cime envoyer --a utilisateur --nature decision_utilisateur" in motif
     assert f"fusion:<équipe>:{sha_de(depot, 'equipe/x')}" in motif
 
 
-def test_avec_accord_sur_la_pointe_actuelle_permis(depot, accord_x, monkeypatch):
-    identite(monkeypatch, "assistant")
-    assert decider(entree("git merge equipe/x", depot), depot) is None
+def test_avec_accord_sur_la_pointe_actuelle_permis(depot, accord_x):
+    assert refuse(depot) is None
 
 
-def test_accord_sur_sha_abrege_de_7_caracteres_ou_plus(depot, monkeypatch):
-    identite(monkeypatch, "assistant")
+def test_accord_sur_sha_abrege_de_7_caracteres_ou_plus(depot):
     donner_accord(depot, sha=sha_de(depot, "equipe/x")[:7])
-    assert decider(entree("git merge equipe/x", depot), depot) is None
+    assert refuse(depot) is None
 
 
-def test_accord_caduc_la_branche_a_avance(depot, accord_x, monkeypatch):
-    identite(monkeypatch, "assistant")
+def test_accord_caduc_la_branche_a_avance(depot, accord_x):
     _git("checkout", "-q", "equipe/x", cwd=depot)
     _git("commit", "-q", "--allow-empty", "-m", "encore", cwd=depot)
     _git("checkout", "-q", "main", cwd=depot)
-    motif = decider(entree("git merge equipe/x", depot), depot)
+    motif = refuse(depot)
     assert motif is not None and "la branche a avancé" in motif
 
 
-def test_accord_deja_consomme_refuse(depot, monkeypatch):
-    identite(monkeypatch, "assistant")
+def test_accord_deja_consomme_refuse(depot):
     donner_accord(depot, clos=True)
-    assert decider(entree("git merge equipe/x", depot), depot) is not None
+    assert refuse(depot) is not None
 
 
-def test_accord_d_un_autre_emetteur_ou_autre_objet_ne_compte_pas(depot, monkeypatch):
+def test_accord_d_un_autre_emetteur_ou_autre_objet_ne_compte_pas(depot):
     from cime.fondation.registre import inscrire_message, ouvrir
-    identite(monkeypatch, "assistant")
     conn = ouvrir(depot)
     sha = sha_de(depot, "equipe/x")
     inscrire_message(conn, de="assistant", a="assistant", nature="accord", resume="faux",
@@ -438,45 +360,24 @@ def test_accord_d_un_autre_emetteur_ou_autre_objet_ne_compte_pas(depot, monkeypa
     inscrire_message(conn, de="utilisateur", a="assistant", nature="refus", resume="non",
                      objet=f"fusion:x:{sha}")
     conn.close()
-    assert decider(entree("git merge equipe/x", depot), depot) is not None
+    assert refuse(depot) is not None
 
 
-def test_registre_illisible_refuse(depot, monkeypatch):
-    identite(monkeypatch, "assistant")
+def test_registre_illisible_refuse(depot):
     etat = depot / ".orga" / "etat"
     etat.mkdir(parents=True)
     (etat / "registre.sqlite").write_text("pas une base" * 100)
-    motif = decider(entree("git merge equipe/x", depot), depot)
+    motif = refuse(depot)
     assert motif is not None and "registre est illisible" in motif
 
 
-def test_un_accord_par_reference(depot, accord_x, monkeypatch):
+def test_un_accord_ne_couvre_que_la_pointe_qu_il_vise(depot, accord_x):
     _git("branch", "equipe/y", "equipe/x", cwd=depot)
-    identite(monkeypatch, "assistant")
-    assert decider(entree("git merge equipe/x equipe/y", depot), depot) is not None
-
-
-def test_la_fusion_faite_consomme_l_accord_une_fusion_par_accord(depot, accord_x, monkeypatch,
-                                                                  capsys):
-    assert lancer(monkeypatch, capsys, CMD, "assistant") == ""
-    _git("merge", "--no-ff", "-m", "x", "equipe/x", cwd=depot)
-    poste(monkeypatch, capsys, CMD, "assistant")
-    conn = sqlite3.connect(depot / ".orga" / "etat" / "registre.sqlite")
-    (etat, preuve), = conn.execute(
-        "SELECT etat, preuve FROM transitions WHERE message_id = ? ORDER BY id DESC LIMIT 1",
-        (accord_x,)).fetchall()
-    conn.close()
-    assert etat == "clos" and json.loads(preuve)["par_evenement"] > 0
-    # deuxième fusion avec le même accord : refus
-    identite(monkeypatch, "assistant")
-    assert decider(entree(CMD, depot), depot) is not None
-
-
-def test_pas_de_consommation_si_non_fusionne(depot, accord_x, monkeypatch, capsys):
-    lancer(monkeypatch, capsys, "git merge equipe/x", "assistant")
-    poste(monkeypatch, capsys, "git merge equipe/x", "assistant")  # la fusion n'a pas eu lieu
-    identite(monkeypatch, "assistant")
-    assert decider(entree("git merge equipe/x", depot), depot) is None  # accord toujours libre
+    _git("checkout", "-q", "equipe/y", cwd=depot)
+    _git("commit", "-q", "--allow-empty", "-m", "y", cwd=depot)
+    _git("checkout", "-q", "main", cwd=depot)
+    assert refuse(depot) is None
+    assert refuse(depot, "equipe/y") is not None
 
 
 def test_abort_et_worktree_n_exigent_aucun_accord(depot, monkeypatch, tmp_path):

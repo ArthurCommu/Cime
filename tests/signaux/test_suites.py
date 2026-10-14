@@ -214,6 +214,17 @@ def _hook(monkeypatch, depot, evenement, commande):
     assert hook.executer(argparse.Namespace(evenement=evenement)) in (0, 2)
 
 
+def _fusionner_par_la_file(monkeypatch, depot):
+    """`cime fusionner x` en processus, sans la suite entière ni la réinstallation ; git est réel."""
+    from cime.fondation import fusionner
+    monkeypatch.setenv(VAR_AGENT, "assistant")
+    monkeypatch.setattr(fusionner, "_suite", lambda projet, dossier: (0, "2 passed in 0.10s\n"))
+    monkeypatch.setattr(fusionner, "_workers_actifs", lambda projet: 0)
+    monkeypatch.setattr(fusionner, "_reinstaller", lambda projet: (True, ""))
+    monkeypatch.setattr(fusionner, "_arreter_facteur", lambda projet: "facteur arrêté")
+    assert fusionner.fusionner(depot, "x", maintenant=True) == 0
+
+
 def test_fusion_reelle_inscrit_les_suites_et_signale_les_lecteurs_du_contrat(depot, monkeypatch, capsys):
     preparer_travail_pret(monkeypatch, depot, capsys, SPEC_RECOPIE)
     # la branche touche le contrat `etat` : les contrats modifiés doivent signaler hote et page seulement
@@ -222,15 +233,12 @@ def test_fusion_reelle_inscrit_les_suites_et_signale_les_lecteurs_du_contrat(dep
     _git("commit", "-qam", "contrat", cwd=depot)
     _git("checkout", "-q", "main", cwd=depot)
     _donner_accord(depot)
-    commande = "git merge --no-ff -m x equipe/x"
-    _hook(monkeypatch, depot, "PreToolUse", commande)
-    assert (depot / ".orga" / "etat" / "fusion-avant").read_text().strip() == sha(depot, "main")
-    _git("merge", "--no-ff", "-m", "x", "equipe/x", cwd=depot)
-    _hook(monkeypatch, depot, "PostToolUse", commande)
+    _fusionner_par_la_file(monkeypatch, depot)
     assert len(consignes_suites(depot)) == 1
     signaux = lignes(depot, "SELECT a, objet FROM messages WHERE nature = 'signalement' ORDER BY a")
     assert signaux == [("coord-hote", "contrat:etat"), ("coord-page", "contrat:etat")]
-    # rejouer le hook sur la même fusion ne redit rien
+    # le hook rejoué sur la commande ne redit rien : la file a tout fait elle-même
+    commande = "cime fusionner x"
     _hook(monkeypatch, depot, "PostToolUse", commande)
     assert len(consignes_suites(depot)) == 1
     assert lignes(depot, "SELECT count(*) FROM messages WHERE nature = 'signalement'") == [(2,)]
@@ -238,10 +246,7 @@ def test_fusion_reelle_inscrit_les_suites_et_signale_les_lecteurs_du_contrat(dep
 
 def test_fusion_qui_ne_touche_aucun_contrat_ne_signale_personne(depot, monkeypatch, capsys):
     _donner_accord(depot)
-    commande = "git merge --no-ff -m x equipe/x"
-    _hook(monkeypatch, depot, "PreToolUse", commande)
-    _git("merge", "--no-ff", "-m", "x", "equipe/x", cwd=depot)
-    _hook(monkeypatch, depot, "PostToolUse", commande)
+    _fusionner_par_la_file(monkeypatch, depot)
     assert lignes(depot, "SELECT count(*) FROM messages WHERE nature = 'signalement'") == [(0,)]
 
 

@@ -141,7 +141,9 @@ CAS = [
     ("cd {W} && git merge x", "P", OK),
     ("git -C {W} reset --hard HEAD", "W", OK),
     ("git -C {D} rebase x", "W", OK),
-    ("git reset --soft HEAD~1", "P", OK),
+    ("git reset --soft HEAD~1", "P", R),   # déplace la pointe de la référence : refusé sous toutes ses formes
+    ("git reset --mixed HEAD~1", "P", R),
+    ("git reset HEAD~1", "P", R),
     ("git checkout -- fichier", "P", OK),
     # du texte, pas des commandes
     ('echo "git push"', "W", OK),

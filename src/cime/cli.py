@@ -158,6 +158,21 @@ def _parser() -> argparse.ArgumentParser:
                    help="sans argument : état et liste des chemins réservés ; avec : réservé à l'utilisateur")
 
     s = sub.add_parser(
+        "fusionner",
+        help="fusionner la branche d'une équipe dans la branche de référence, après la suite "
+             "entière (Assistant et utilisateur)",
+        description="Fige la tête de la branche de l'équipe, vérifie les règles d'accord, attend "
+                    "qu'aucun worker ne tourne, prend le verrou (une fusion à la fois), fusionne "
+                    "dans un worktree d'essai et lance la suite entière comme la CI. Au premier "
+                    "échec, refuse et le dit ; sinon annonce, fusionne, journalise, réinstalle cime "
+                    "et arrête le facteur. Codes de sortie : 0 fusionné ; 1 refus ; 2 occupé ou "
+                    "machine chargée.")
+    s.add_argument("equipe")
+    s.add_argument("--maintenant", action="store_true",
+                   help="ne pas attendre que les workers en cours se terminent")
+    s.add_argument("--message", help="sujet du commit de fusion (défaut : « Fusion <équipe> <sha7> »)")
+
+    s = sub.add_parser(
         "plafond",
         help="le plafond de workers actifs de la machine : le lire, ou (utilisateur) le régler",
         description="Le plafond est un réglage de la machine, valable pour tous les projets "

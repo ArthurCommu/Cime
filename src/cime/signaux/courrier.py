@@ -3,6 +3,7 @@
 Partagé par les hooks (`fondation/hook.py` via `signaux/hooks.py`) et par le facteur. Rien ici ne touche un terminal.
 """
 import json
+import re
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -263,22 +264,42 @@ def prendre(conn, a, voie, auteur, preuve_base, limite=LOT_MAX, bail_s=BAIL_S) -
 
 # --- format -----------------------------------------------------------------------------
 
+# Les mots que `emetteur_lisible` rend. `hooks.py` reconnaît le préfixe d'un courrier tapé à
+# partir de ces mêmes constantes (`expression_prefixe`) : un mot ne change qu'ici.
+LISIBLE_ASSISTANT = "Assistant"
+LISIBLE_UTILISATEUR = "Utilisateur"
+LISIBLE_CIME = "Cime"
+PREFIXE_COORDINATEUR = "coordinateur "
+PREFIXE_WORKER = "worker "
+
+
 def emetteur_lisible(de: str, equipe: str | None = None) -> str:
     if de == "assistant":
-        return "Assistant"
+        return LISIBLE_ASSISTANT
     if de == "utilisateur":
-        return "Utilisateur"
+        return LISIBLE_UTILISATEUR
     if de == "cime":
-        return "Cime"
+        return LISIBLE_CIME
     if de.startswith("coord-"):
-        return f"coordinateur {de[len('coord-'):]}"
+        return f"{PREFIXE_COORDINATEUR}{de[len('coord-'):]}"
     if de.startswith("worker-"):
         reste = de[len("worker-"):]
         if equipe and reste.startswith(equipe + "-"):
-            return f"worker {equipe}/{reste[len(equipe) + 1:]}"
+            return f"{PREFIXE_WORKER}{equipe}/{reste[len(equipe) + 1:]}"
         equipe_, _, tache = reste.partition("-")
-        return f"worker {equipe_}/{tache}" if tache else f"worker {reste}"
+        return f"{PREFIXE_WORKER}{equipe_}/{tache}" if tache else f"{PREFIXE_WORKER}{reste}"
     return de
+
+
+def expression_prefixe() -> str:
+    """Le préfixe d'un courrier tapé, en expression régulière : chaque forme que `emetteur_lisible`
+    peut rendre, rien d'autre. Un nom d'agent ne contient que des minuscules, chiffres et tirets ;
+    un `worker` sans équipe ne porte pas de « / »."""
+    nom = "[a-z0-9-]+"
+    formes = [re.escape(LISIBLE_ASSISTANT), re.escape(LISIBLE_UTILISATEUR), re.escape(LISIBLE_CIME),
+              re.escape(PREFIXE_COORDINATEUR) + nom,
+              re.escape(PREFIXE_WORKER) + nom + f"(?:/{nom})?"]
+    return "(?:" + "|".join(formes) + ") : "
 
 
 def _racine_projet(conn) -> Path | None:

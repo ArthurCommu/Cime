@@ -50,13 +50,29 @@ def test_charge_qui_n_est_pas_une_table_refusee(tmp_path):
         lire_manifeste(racine)
 
 
-def test_le_gabarit_declare_le_plafond_a_1():
+def test_workers_max_a_1_posee_a_la_main_reste_lue(tmp_path):
+    assert lire_manifeste(manifeste(tmp_path, "[charge]\nworkers_max = 1\n")).workers_max == 1
+
+
+def test_le_gabarit_ne_pose_pas_de_plafond_de_projet():
     import tomllib
     from pathlib import Path
 
     gabarit = (Path(__file__).resolve().parents[2] / "src" / "cime" / "gabarits"
                / ".orga" / "projet.toml")
-    assert tomllib.loads(gabarit.read_text())["charge"]["workers_max"] == 1
+    assert "workers_max" not in tomllib.loads(gabarit.read_text())["charge"]
+
+
+def test_init_neuf_ne_limite_pas_les_workers(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from cime.fondation import init
+
+    monkeypatch.setattr(init, "executable_cime", lambda: "/opt/outils/bin/cime")
+    p = tmp_path / "neuf"
+    assert init.executer(SimpleNamespace(dossier=str(p), utilisateur="Camille",
+                                         nom_projet=None, prefixe=None)) == 0
+    assert lire_manifeste(p).workers_max is None
 
 
 # --- charge.coordinateur_repos_minutes ----------------------------------------------------------

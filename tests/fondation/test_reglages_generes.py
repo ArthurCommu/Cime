@@ -399,12 +399,19 @@ def test_outil_hors_projet_ajoute_une_fois_en_lecture(projet, tmp_path, monkeypa
         assert not any(c == str(env.resolve()) for c in filesystem["allowWrite"]), identite
 
 
-def test_integration_ecrit_dans_essais_et_jamais_private_tmp(projet):
+def test_integration_ecrit_dans_essais_et_jamais_private_tmp(projet, monkeypatch):
+    """Le projet d'essai peut lui-même vivre sous `/private/tmp` (selon le `TMPDIR` de celui qui lance
+    la suite) : la propriété est « aucune zone de `/tmp` hors du projet et de la maison », jamais un préfixe brut."""
+    for variable in ("TMPDIR", "TMP", "TEMP", "CLAUDE_CODE_TMPDIR"):
+        monkeypatch.setenv(variable, "/private/tmp/hors-du-projet")
     (projet / ".orga" / "teams" / "integration").mkdir(parents=True)
     ecriture = _ecriture(projet, "worker-integration-r1", "coord", integration=True)
     assert str(projet / ".orga/etat/essais") in ecriture
     assert str(projet / ".orga/teams/integration") in ecriture
-    assert not any(c.startswith("/private/tmp") for c in ecriture)
+    chez_soi = (projet.resolve(), Path.home().resolve())   # le projet et la maison d'essai (caches)
+    hors_du_projet = [c for c in ecriture if not any(Path(c).resolve().is_relative_to(r) for r in chez_soi)]
+    assert not any(Path(c).resolve().is_relative_to(Path("/private/tmp")) or
+                   Path(c).is_relative_to(Path("/tmp")) for c in hors_du_projet), hors_du_projet
     assert str(projet / ".orga/worktrees/x") not in ecriture
 
 
